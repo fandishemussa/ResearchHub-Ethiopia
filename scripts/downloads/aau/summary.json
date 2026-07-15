@@ -1,0 +1,12 @@
+{
+  "source": "aau",
+  "total_results": 10,
+  "counts": {
+    "downloaded": 10
+  },
+  "document_types": {
+    "pdf": 10
+  },
+  "total_downloaded_bytes": 21357430,
+  "manifest": "manifest.json"
+}

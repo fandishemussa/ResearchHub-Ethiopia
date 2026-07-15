@@ -1,0 +1,119 @@
+{
+  "source": "wku",
+  "source_name": "Wolkite University Research Publication System",
+  "created_at": "2026-07-13T18:43:57.021229+00:00",
+  "updated_at": "2026-07-13T20:01:49.829672+00:00",
+  "statistics": {
+    "total_found": 3,
+    "discovered": 0,
+    "downloading": 0,
+    "downloaded": 3,
+    "already_exists": 0,
+    "failed": 0,
+    "skipped": 0,
+    "total_downloaded_bytes": 1958454
+  },
+  "documents": [
+    {
+      "document_id": "wku:987654321/1341::https://rps.wku.edu.et/server/api/core/bitstreams/2fe1b561-1dcc-46e6-9ca1-4bad8cac6426/content",
+      "source": "wku",
+      "external_id": "wku:987654321/1341",
+      "title": "ASSESSMENT ON REPRODUCTIVE PERFORMANCE AND MILK  YEILD OF WOLKITE UNIVERSITY DAIRY FARM",
+      "authors": [
+        "Beyene  Tedla",
+        "Asferachew   Anasha",
+        "Samato Shako"
+      ],
+      "issued_date": "2019-06",
+      "landing_url": "https://rps.wku.edu.et/handle/987654321/1341",
+      "document_url": "https://rps.wku.edu.et/server/api/core/bitstreams/2fe1b561-1dcc-46e6-9ca1-4bad8cac6426/content",
+      "filename": "BEYENE 65.pdf",
+      "document_type": "pdf",
+      "mime_type": "application/pdf",
+      "expected_size_bytes": 410596,
+      "downloaded_size_bytes": 410596,
+      "progress_percent": 100.0,
+      "status": "downloaded",
+      "local_path": "downloads\\wku\\pdf\\1341_ASSESSMENT ON REPRODUCTIVE PERFORMANCE AND MILK YEILD OF WOLKITE UNIVERSITY DAIRY FARM.pdf",
+      "partial_path": null,
+      "checksum_sha256": "e849d3e87fc414b05cd0eba17440e1ef6bd62496eae1c6d4b8d8f59792820157",
+      "retry_count": 0,
+      "message": null,
+      "metadata": {
+        "candidate_index": 1,
+        "repository_kind": "wku_rest"
+      },
+      "discovered_at": "2026-07-13T19:59:18.022564+00:00",
+      "download_started_at": "2026-07-13T19:59:18.023729+00:00",
+      "download_completed_at": "2026-07-13T19:59:45.079518+00:00",
+      "last_attempt_at": "2026-07-13T19:59:45.053730+00:00",
+      "updated_at": "2026-07-13T19:59:45.079518+00:00"
+    },
+    {
+      "document_id": "wku:987654321/1243::https://rps.wku.edu.et/server/api/core/bitstreams/6c86cae3-b388-4f38-9e13-d343c96f6c5d/content",
+      "source": "wku",
+      "external_id": "wku:987654321/1243",
+      "title": "TO INVESTIGATE PRACTICES AND CHALLENGES OF EDUCATIONAL  SUPERVISION IN SECONDARY SCHOOL OF CHALIA WOREDA, WEST SHOA  ZONE OF OROMIA REGION.",
+      "authors": [
+        "ALEMNESH NAGASA"
+      ],
+      "issued_date": "2020-12",
+      "landing_url": "https://rps.wku.edu.et/handle/987654321/1243",
+      "document_url": "https://rps.wku.edu.et/server/api/core/bitstreams/6c86cae3-b388-4f38-9e13-d343c96f6c5d/content",
+      "filename": "Alemnesh Negasa.pdf",
+      "document_type": "pdf",
+      "mime_type": "application/pdf",
+      "expected_size_bytes": 788184,
+      "downloaded_size_bytes": 788184,
+      "progress_percent": 100.0,
+      "status": "downloaded",
+      "local_path": "downloads\\wku\\pdf\\1243_TO INVESTIGATE PRACTICES AND CHALLENGES OF EDUCATIONAL SUPERVISION IN SECONDARY SCHOOL OF CHALIA WOR.pdf",
+      "partial_path": null,
+      "checksum_sha256": "f430a09854852e2625379b9d78affb383e7659fed3d83c598ed5cffbc436e5f1",
+      "retry_count": 0,
+      "message": null,
+      "metadata": {
+        "candidate_index": 1,
+        "repository_kind": "wku_rest"
+      },
+      "discovered_at": "2026-07-13T19:59:49.354757+00:00",
+      "download_started_at": "2026-07-13T19:59:49.358183+00:00",
+      "download_completed_at": "2026-07-13T20:00:31.252472+00:00",
+      "last_attempt_at": "2026-07-13T20:00:30.809493+00:00",
+      "updated_at": "2026-07-13T20:00:31.252472+00:00"
+    },
+    {
+      "document_id": "wku:987654321/1590::https://rps.wku.edu.et/server/api/core/bitstreams/aac64190-f49a-4273-994e-66c0892732f6/content",
+      "source": "wku",
+      "external_id": "wku:987654321/1590",
+      "title": "THEROLEOFFINANCIALINSTITUTIONINDEVLOPMENTOFSMALLAND MEDUIMENTERPRISES(THECASESTUDYCHAHAWOREDA)",
+      "authors": [
+        "MEBRHIT   TESFAYE, MEBRHIT"
+      ],
+      "issued_date": "2019-06",
+      "landing_url": "https://rps.wku.edu.et/handle/987654321/1590",
+      "document_url": "https://rps.wku.edu.et/server/api/core/bitstreams/aac64190-f49a-4273-994e-66c0892732f6/content",
+      "filename": "Mabrit.pdf",
+      "document_type": "pdf",
+      "mime_type": "application/pdf",
+      "expected_size_bytes": 759674,
+      "downloaded_size_bytes": 759674,
+      "progress_percent": 100.0,
+      "status": "downloaded",
+      "local_path": "downloads\\wku\\pdf\\1590_THEROLEOFFINANCIALINSTITUTIONINDEVLOPMENTOFSMALLAND MEDUIMENTERPRISES(THECASESTUDYCHAHAWOREDA).pdf",
+      "partial_path": null,
+      "checksum_sha256": "e83f34f3ceacf0f02f2e932ec655f455bd84dcfd71e46b70cab90eb901049255",
+      "retry_count": 0,
+      "message": null,
+      "metadata": {
+        "candidate_index": 1,
+        "repository_kind": "wku_rest"
+      },
+      "discovered_at": "2026-07-13T20:00:35.662221+00:00",
+      "download_started_at": "2026-07-13T20:00:35.666591+00:00",
+      "download_completed_at": "2026-07-13T20:01:49.829672+00:00",
+      "last_attempt_at": "2026-07-13T20:01:49.813594+00:00",
+      "updated_at": "2026-07-13T20:01:49.829672+00:00"
+    }
+  ]
+}

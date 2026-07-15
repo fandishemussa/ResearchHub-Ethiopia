@@ -1,0 +1,26 @@
+{
+  "max_concurrent_connectors": 3,
+  "retry_failed_jobs": true,
+  "job_max_attempts": 3,
+  "connectors": [
+    {
+      "code": "haramaya-ir",
+      "name": "Haramaya Institutional Repository",
+      "connector_type": "oai-pmh",
+      "source_type": "oai-pmh",
+      "base_url": "https://repository.haramaya.edu.et/oai/request",
+      "metadata_prefix": "oai_dc",
+      "set_spec": null,
+      "from_date": "2024-01-01",
+      "until_date": null,
+      "enabled": true,
+      "schedule": "@daily",
+      "rate_limit_per_second": 2,
+      "max_retries": 4,
+      "backoff_factor": 0.5,
+      "pool_connections": 10,
+      "pool_maxsize": 20
+    }
+  ]
+}
+

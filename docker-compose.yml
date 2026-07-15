@@ -1,0 +1,514 @@
+# Local development stack for ResearchHub Ethiopia.
+
+name: researchhub-ethiopia
+
+
+# ---------------------------------------------------------------------------
+# Shared backend configuration
+# ---------------------------------------------------------------------------
+
+x-backend-common: &backend-common
+  image: researchhub-ethiopia-backend:dev
+
+  env_file:
+    - .env
+
+  environment:
+    HF_HOME: /app/.cache/huggingface
+
+    RESEARCHHUB_HARVEST_BATCH_SIZE: "500"
+    RESEARCHHUB_HARVEST_REQUEST_TIMEOUT_SECONDS: "60"
+    RESEARCHHUB_HARVEST_MAX_RETRIES: "3"
+
+    RESEARCHHUB_IMPORT_MAX_FILE_SIZE_MB: "100"
+    RESEARCHHUB_IMPORT_STORAGE_PATH: /app/data/imports
+    RESEARCHHUB_IMPORT_PREVIEW_LIMIT: "20"
+
+  volumes:
+    # Application source code
+    - ./backend:/app/backend
+    - ./harvester:/app/harvester
+    - ./ai:/app/ai
+    - ./scripts:/app/scripts
+
+    # Includes:
+    # /app/data/research-documents/aau
+    # /app/data/research-documents/bdu
+    # /app/data/research-documents/wku
+    - ./data:/app/data
+
+    # Persist downloaded Hugging Face models
+    - huggingface-cache:/app/.cache/huggingface
+
+
+services:
+
+  # -------------------------------------------------------------------------
+  # PostgreSQL + pgvector
+  # -------------------------------------------------------------------------
+
+  postgres:
+    image: pgvector/pgvector:pg17
+
+    environment:
+      POSTGRES_USER: researchhub
+      POSTGRES_PASSWORD: researchhub
+      POSTGRES_DB: researchhub
+
+    ports:
+      - "5432:5432"
+
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U researchhub -d researchhub"
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+    restart: unless-stopped
+
+
+  # -------------------------------------------------------------------------
+  # Redis
+  # -------------------------------------------------------------------------
+
+  redis:
+    image: redis:7-alpine
+
+    ports:
+      - "6379:6379"
+
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "redis-cli",
+          "ping"
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+    restart: unless-stopped
+
+
+  # -------------------------------------------------------------------------
+  # FastAPI backend
+  # -------------------------------------------------------------------------
+
+  api:
+    <<: *backend-common
+
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+
+    command:
+      - uvicorn
+      - researchhub.main:app
+      - --host
+      - 0.0.0.0
+      - --port
+      - "8111"
+      - --reload
+
+    expose:
+      - "8111"
+
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+      redis:
+        condition: service_healthy
+
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://localhost:8111/health/live', timeout=2)"
+        ]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 15s
+
+    restart: unless-stopped
+
+
+  # -------------------------------------------------------------------------
+  # Next.js frontend
+  # -------------------------------------------------------------------------
+
+  frontend:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+      target: development
+
+    environment:
+      INTERNAL_API_URL: http://api:8111
+      NEXT_TELEMETRY_DISABLED: "1"
+
+    ports:
+      - "3000:3000"
+
+    volumes:
+      - ./frontend:/app
+      - frontend-node-modules:/app/node_modules
+      - frontend-next-cache:/app/.next
+
+    depends_on:
+      api:
+        condition: service_started
+
+    restart: unless-stopped
+
+
+  # -------------------------------------------------------------------------
+  # Nginx reverse proxy
+  # -------------------------------------------------------------------------
+
+  reverse-proxy:
+    image: nginx:1.27-alpine
+
+    ports:
+      - "8111:8111"
+      - "8080:8080"
+
+    volumes:
+      - ./docker/nginx.conf:/etc/nginx/nginx.conf:ro
+
+    depends_on:
+      api:
+        condition: service_healthy
+
+      frontend:
+        condition: service_started
+
+    restart: unless-stopped
+
+
+  # -------------------------------------------------------------------------
+  # Main Celery worker
+  # -------------------------------------------------------------------------
+
+  worker:
+    <<: *backend-common
+
+    command:
+      - celery
+      - -A
+      - researchhub.application.worker:celery_app
+      - worker
+      - --loglevel=INFO
+      - -Q
+      - celery,harvest,imports
+
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+      redis:
+        condition: service_healthy
+
+      api:
+        condition: service_started
+
+    restart: unless-stopped
+
+
+  # -------------------------------------------------------------------------
+  # Dedicated harvesting worker
+  # Start with: docker compose --profile scaling up -d
+  # -------------------------------------------------------------------------
+
+  celery-harvest-worker:
+    <<: *backend-common
+
+    profiles:
+      - scaling
+
+    command:
+      - celery
+      - -A
+      - researchhub.application.worker:celery_app
+      - worker
+      - --loglevel=INFO
+      - -Q
+      - harvest
+      - --concurrency=2
+      - --hostname=harvest@%h
+
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+      redis:
+        condition: service_healthy
+
+    restart: unless-stopped
+
+
+  # -------------------------------------------------------------------------
+  # Dedicated import worker
+  # -------------------------------------------------------------------------
+
+  celery-import-worker:
+    <<: *backend-common
+
+    profiles:
+      - scaling
+
+    command:
+      - celery
+      - -A
+      - researchhub.application.worker:celery_app
+      - worker
+      - --loglevel=INFO
+      - -Q
+      - imports
+      - --concurrency=2
+      - --hostname=imports@%h
+
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+      redis:
+        condition: service_healthy
+
+    restart: unless-stopped
+
+
+  # -------------------------------------------------------------------------
+  # Dedicated embedding worker
+  # -------------------------------------------------------------------------
+
+  celery-embedding-worker:
+    <<: *backend-common
+
+    profiles:
+      - scaling
+      - ai
+
+    command:
+      - celery
+      - -A
+      - researchhub.application.worker:celery_app
+      - worker
+      - --loglevel=INFO
+      - -Q
+      - ai_embeddings
+      - --concurrency=1
+      - --hostname=embeddings@%h
+
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+      redis:
+        condition: service_healthy
+
+    restart: unless-stopped
+
+
+  # -------------------------------------------------------------------------
+  # General AI worker
+  # -------------------------------------------------------------------------
+
+  celery-ai-worker:
+    <<: *backend-common
+
+    profiles:
+      - scaling
+      - ai
+
+    command:
+      - celery
+      - -A
+      - researchhub.application.worker:celery_app
+      - worker
+      - --loglevel=INFO
+      - -Q
+      - ai_generation,ai_analysis,ai_chat,documents,notifications,maintenance
+      - --concurrency=2
+      - --hostname=ai@%h
+
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+      redis:
+        condition: service_healthy
+
+    restart: unless-stopped
+
+
+  # -------------------------------------------------------------------------
+  # Application scheduler
+  # -------------------------------------------------------------------------
+
+  scheduler:
+    <<: *backend-common
+
+    command:
+      - python
+      - -m
+      - researchhub.application.scheduler
+
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+      redis:
+        condition: service_healthy
+
+      api:
+        condition: service_started
+
+    restart: unless-stopped
+
+
+  # -------------------------------------------------------------------------
+  # Document downloader
+  # Start with: docker compose --profile downloader run --rm document-downloader
+  # -------------------------------------------------------------------------
+
+  document-downloader:
+    profiles:
+      - downloader
+
+    build:
+      context: ./scripts
+      dockerfile: document_downloader/Dockerfile
+
+    working_dir: /app/scripts
+
+    environment:
+      PYTHONUNBUFFERED: "1"
+      PYTHONDONTWRITEBYTECODE: "1"
+
+    volumes:
+      - ./scripts:/app/scripts
+
+      # Downloader writes directly into:
+      # data/research-documents/aau
+      # data/research-documents/bdu
+      # data/research-documents/wku
+      - ./data/research-documents:/app/scripts/downloads
+
+      - ./backend:/app/backend
+      - ./harvester:/app/harvester
+      - ./ai:/app/ai
+      - ./data:/app/data
+
+      - huggingface-cache:/app/.cache/huggingface
+
+    restart: "no"
+
+
+  # -------------------------------------------------------------------------
+  # Prometheus
+  # Start with: docker compose --profile observability up -d
+  # -------------------------------------------------------------------------
+
+  prometheus:
+    profiles:
+      - observability
+
+    image: prom/prometheus:v2.55.1
+
+    ports:
+      - "9090:9090"
+
+    volumes:
+      - ./docker/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+
+    depends_on:
+      api:
+        condition: service_healthy
+
+    restart: unless-stopped
+
+
+  # -------------------------------------------------------------------------
+  # Grafana
+  # -------------------------------------------------------------------------
+
+  grafana:
+    profiles:
+      - observability
+
+    image: grafana/grafana:11.4.0
+
+    ports:
+      - "3001:3000"
+
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: researchhub
+
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./docker/grafana-datasources.yml:/etc/grafana/provisioning/datasources/datasources.yml:ro
+
+    depends_on:
+      prometheus:
+        condition: service_started
+
+    restart: unless-stopped
+
+
+  # -------------------------------------------------------------------------
+  # PgBouncer
+  # Start with: docker compose --profile pgbouncer up -d
+  # -------------------------------------------------------------------------
+
+  pgbouncer:
+    profiles:
+      - pgbouncer
+
+    image: edoburu/pgbouncer:1.23.1-p3
+
+    environment:
+      DB_HOST: postgres
+      DB_PORT: "5432"
+      DB_USER: researchhub
+      DB_PASSWORD: researchhub
+      DB_NAME: researchhub
+
+      POOL_MODE: transaction
+      DEFAULT_POOL_SIZE: ${PGBOUNCER_DEFAULT_POOL_SIZE:-20}
+      RESERVE_POOL_SIZE: ${PGBOUNCER_RESERVE_POOL_SIZE:-5}
+      MAX_CLIENT_CONN: ${PGBOUNCER_MAX_CLIENT_CONNECTIONS:-1000}
+      AUTH_TYPE: scram-sha-256
+
+    expose:
+      - "5432"
+
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+    restart: unless-stopped
+
+
+# ---------------------------------------------------------------------------
+# Named volumes
+# ---------------------------------------------------------------------------
+
+volumes:
+  postgres-data:
+  grafana-data:
+  frontend-node-modules:
+  frontend-next-cache:
+  huggingface-cache:

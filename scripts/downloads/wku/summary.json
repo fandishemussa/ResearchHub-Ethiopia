@@ -1,0 +1,12 @@
+{
+  "source": "wku",
+  "total_results": 3,
+  "counts": {
+    "downloaded": 3
+  },
+  "document_types": {
+    "pdf": 3
+  },
+  "total_downloaded_bytes": 1958454,
+  "manifest": "manifest.json"
+}

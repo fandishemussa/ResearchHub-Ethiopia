@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<OAI-PMH xmlns="http://www.openarchives.org/OAI/2.0/">
+  <responseDate>2026-07-12T23:45:36Z</responseDate>
+  <request verb="ListRecords" metadataPrefix="oai_dc">https://example.edu/oai/request</request>
+  <ListRecords>
+    <record>
+      <header><identifier>oai:localhost:123456789/4991</identifier><datestamp>2019-04-10T08:31:59Z</datestamp></header>
+      <metadata>
+        <oai_dc:dc xmlns:oai_dc="http://www.openarchives.org/OAI/2.0/oai_dc/" xmlns:dc="http://purl.org/dc/elements/1.1/">
+          <dc:title>Example Thesis</dc:title>
+          <dc:identifier>http://hdl.handle.net/123456789/4991</dc:identifier>
+        </oai_dc:dc>
+      </metadata>
+    </record>
+    <resumptionToken completeListSize="101" cursor="0">oai_dc////100</resumptionToken>
+  </ListRecords>
+</OAI-PMH>

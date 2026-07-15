@@ -1,0 +1,557 @@
+Metadata-Version: 2.4
+Name: researchhub-ethiopia
+Version: 0.1.0
+Summary: AI-powered research information management platform for Ethiopian universities.
+Requires-Python: >=3.13
+Description-Content-Type: text/markdown
+License-File: LICENSE
+Requires-Dist: fastapi>=0.115
+Requires-Dist: uvicorn[standard]>=0.32
+Requires-Dist: sqlalchemy[asyncio]>=2.0
+Requires-Dist: asyncpg>=0.30
+Requires-Dist: psycopg[binary]>=3.2
+Requires-Dist: alembic>=1.14
+Requires-Dist: pydantic>=2.10
+Requires-Dist: pydantic-settings>=2.7
+Requires-Dist: redis>=5.2
+Requires-Dist: celery>=5.4
+Requires-Dist: apscheduler>=3.10
+Requires-Dist: httpx>=0.28
+Requires-Dist: requests<3,>=2.31
+Requires-Dist: python-dateutil>=2.9
+Requires-Dist: python-multipart>=0.0.20
+Requires-Dist: PyJWT>=2.10
+Requires-Dist: pwdlib[argon2]>=0.3
+Requires-Dist: structlog>=24.4
+Requires-Dist: orjson>=3.10
+Requires-Dist: pgvector<1,>=0.3
+Requires-Dist: beautifulsoup4<5,>=4.12
+Provides-Extra: ai
+Requires-Dist: sentence-transformers>=3.3; extra == "ai"
+Requires-Dist: numpy>=1.26; extra == "ai"
+Requires-Dist: torch>=2.1; extra == "ai"
+Requires-Dist: langchain>=0.3; extra == "ai"
+Provides-Extra: test
+Requires-Dist: pytest>=8.3; extra == "test"
+Requires-Dist: pytest-asyncio>=0.24; extra == "test"
+Requires-Dist: ruff>=0.8; extra == "test"
+Requires-Dist: mypy>=1.13; extra == "test"
+Dynamic: license-file
+
+# ResearchHub Ethiopia
+
+ResearchHub Ethiopia is an AI-assisted research information management platform for aggregating, normalizing, searching, and analysing scholarly output from Ethiopian universities.
+
+It connects institutional repositories through OAI-PMH or validated file imports, preserves metadata provenance, supports semantic discovery with PostgreSQL and pgvector, and provides operational workflows for harvesting, import review, research intelligence, and repository health monitoring.
+
+> **Project status:** active development. The architecture includes scalability and observability foundations, but no production-capacity claim—including support for 1,000 concurrent users—is made without repeatable load-test evidence on documented hardware.
+
+## Highlights
+
+- **Repository aggregation:** managed OAI-PMH sources, DSpace-compatible metadata, full and incremental harvesting, resumption tokens, checkpoints, retries, cancellation, and job history.
+- **Validated imports:** XML, JSON, and CSV uploads up to the configured limit, browser upload progress, preview-before-confirmation, tolerant row validation, and duplicate-file protection.
+- **National research catalogue:** universities, repositories, publications, authors, journals, keywords, controlled vocabularies, provenance, and metadata history.
+- **Research discovery:** faceted metadata search, pgvector semantic search, publication similarity, safe external links, deterministic result types, and publication details.
+- **AI research intelligence:** grounded university-research assistant, summaries, keyword extraction, citation generation, duplicate candidates, and research trend APIs with local-first provider defaults.
+- **Metadata quality:** configurable quality scoring, issue tracking, historical reports, and recalculation workflows.
+- **Authentication foundation:** Argon2 password hashing, short-lived access tokens, rotating refresh sessions, token reuse detection, account lockout, recovery tokens, and Redis-backed authentication rate limits.
+- **Concurrency controls:** PostgreSQL row/advisory locks, one-active-harvest protection, bounded request and connection pools, import confirmation locking, and safe Celery task cleanup.
+- **Operations:** health/readiness endpoints, structured request logs, request/instance IDs, Prometheus metrics, Grafana, Nginx proxying, optional PgBouncer, isolated Celery queue profiles, and Locust workloads.
+- **Modern frontend:** Next.js 16, React 19, TypeScript, Tailwind CSS, TanStack Query, Recharts, responsive layouts, accessible loading/error states, and Docker-aware API proxying.
+
+## Architecture
+
+```text
+Browser
+  │
+  ├── :3000 ── Next.js ── /backend-api/* ─┐
+  │                                        │
+  └── :8080 ── Nginx ──────────────────────┤
+                                           ▼
+                                    FastAPI replicas
+                                      │    │    │
+                         ┌────────────┘    │    └─────────────┐
+                         ▼                 ▼                  ▼
+               PostgreSQL + pgvector    Redis          Shared import storage
+                         ▲                 ▲
+                         └──── Celery workers + scheduler
+
+Prometheus ──scrapes──> FastAPI /metrics ──visualized by──> Grafana
+```
+
+Request-critical state is intended to remain outside API process memory:
+
+- PostgreSQL stores durable application, authentication, job, and research data.
+- Redis provides the Celery broker/result backend and short-lived distributed coordination.
+- Mounted or object storage holds uploaded import files.
+- Celery isolates harvesting and expensive AI/background workloads from interactive API traffic.
+
+More detail is available in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) and [docs/architecture/scalability.md](docs/architecture/scalability.md).
+
+## Technology stack
+
+| Layer | Technology |
+|---|---|
+| Web application | Next.js 16, React 19, TypeScript, Tailwind CSS, TanStack Query |
+| API | Python 3.13, FastAPI, Pydantic 2 |
+| Persistence | SQLAlchemy 2 async, Alembic, PostgreSQL 17, pgvector |
+| Background work | Celery, Redis |
+| Harvesting | OAI-PMH, XML parsing, DSpace-oriented normalization |
+| AI | Sentence Transformers, PyTorch CPU, optional OpenAI-compatible/Ollama providers |
+| Proxy/pooling | Nginx, optional PgBouncer transaction pooling |
+| Observability | structlog, Prometheus, Grafana |
+| Testing | pytest, Ruff, mypy, Vitest, Testing Library, ESLint, Locust |
+
+## Repository layout
+
+```text
+ResearchHub-Ethiopia/
+├── ai/                 Embeddings, semantic utilities, and AI provider contracts
+├── backend/            FastAPI API, domain schemas, services, persistence, migrations
+├── data/               Local harvested datasets and import summaries
+├── docker/             Nginx, Prometheus, and Grafana configuration
+├── docs/               Architecture, feature, performance, and operations guides
+├── frontend/           Next.js application and frontend tests
+├── harvester/          Connector framework, normalization, and harvesting engine
+├── load-tests/         Locust workloads, fixtures, and report output
+├── scripts/            Administration, import, and embedding utilities
+├── tests/              Backend and harvester test suite
+├── docker-compose.yml  Development and optional production-like profiles
+├── pyproject.toml       Python dependencies and tooling
+└── .env.example        Typed configuration reference
+```
+
+## Prerequisites
+
+For the recommended Docker workflow:
+
+- Docker Desktop with Docker Compose v2
+- At least 8 GB RAM; more is recommended when loading local embedding models
+- Git
+
+For host-based development:
+
+- Python 3.13
+- Node.js 20 or newer
+- PostgreSQL 17 with pgvector
+- Redis 7
+
+## Quick start with Docker
+
+From the repository root in PowerShell:
+
+```powershell
+Copy-Item .env.example .env
+docker compose build
+docker compose up -d
+docker compose exec api alembic -c backend/alembic.ini upgrade head
+docker compose ps
+```
+
+Open:
+
+| Service | URL |
+|---|---|
+| Frontend development server | <http://localhost:3000> |
+| Combined Nginx entry point | <http://localhost:8080> |
+| API and OpenAPI documentation | <http://localhost:8111/docs> |
+| API readiness | <http://localhost:8111/health/ready> |
+| Prometheus metrics | <http://localhost:8111/metrics> |
+
+The browser uses `/backend-api/*`. Next.js rewrites those requests to `INTERNAL_API_URL=http://api:8111`, so Docker-internal hostnames are never exposed to browser code.
+
+### Useful lifecycle commands
+
+```powershell
+docker compose logs -f api worker frontend
+docker compose restart api
+docker compose restart worker
+docker compose restart frontend
+docker compose down
+```
+
+Restart the worker after changing Celery task or persistence code; Celery does not hot-reload Python modules. Restart the frontend after changing `next.config.ts`.
+
+## Database migrations
+
+```powershell
+docker compose exec api alembic -c backend/alembic.ini heads
+docker compose exec api alembic -c backend/alembic.ini current
+docker compose exec api alembic -c backend/alembic.ini upgrade head
+```
+
+Create a migration only after reviewing model and database differences:
+
+```powershell
+docker compose exec api alembic -c backend/alembic.ini revision --autogenerate -m "describe change"
+```
+
+Never run destructive downgrade or reset commands against a database containing irreplaceable research data.
+
+## Adding a research source
+
+In the web application, open **Repositories → Add source**.
+
+For an OAI-PMH endpoint such as:
+
+```text
+https://example.edu/oai/request?verb=ListRecords&metadataPrefix=oai_dc
+```
+
+enter:
+
+```text
+Source type:       OAI-PMH Repository
+OAI-PMH endpoint:  https://example.edu/oai/request
+Metadata prefix:   oai_dc
+Set specification: leave blank to harvest every exposed set
+```
+
+Do not include `verb`, `metadataPrefix`, or pagination parameters in the saved endpoint. ResearchHub constructs protocol requests itself.
+
+Available workflows include:
+
+- **Test connection:** identify the repository and validate metadata-format support.
+- **Dry run:** retrieve and normalize without importing confirmed research records.
+- **Incremental harvest:** continue from the last successful harvest date.
+- **Full harvest:** traverse all available records.
+- **Disable:** retain configuration and history while preventing new jobs.
+- **Remove:** hide/archive sources with history or physically remove unused sources.
+
+One active harvest per source and a configurable global harvest capacity are enforced in the backend, not only in the UI.
+
+## Importing metadata files
+
+Repository pages accept `.json`, `.csv`, and `.xml` files. The workflow is:
+
+1. Select a file.
+2. Watch byte-level upload progress.
+3. Review valid and skipped record counts.
+4. Inspect sample records and validation warnings.
+5. Confirm the database import.
+
+JSON can be a top-level array or an object containing `records` or `items`. A minimal record is:
+
+```json
+{
+  "external_id": "repository:item:123",
+  "title": "Agricultural resilience in Ethiopia",
+  "authors": ["Aster Bekele"],
+  "publication_year": 2025,
+  "abstract": "...",
+  "subjects": ["Agriculture", "Climate resilience"],
+  "landing_page_url": "https://repository.example.edu/items/123"
+}
+```
+
+The importer also understands common DSpace metadata keys such as `name`, `dc.title`, `dc.contributor.author`, `dc.description.abstract`, `dc.date.issued`, `dc.subject`, and `dc.identifier.uri`. Invalid rows are reported and skipped rather than causing the entire file to fail.
+
+Default limits:
+
+- Backend import file limit: 100 MB
+- Next.js proxy body limit: 101 MB, including multipart overhead
+- Normal non-upload API body limit: 10 MB
+- Upload/validation client timeout: 120 seconds
+
+Adjust the backend and proxy limits together if requirements change.
+
+## Search and AI workflows
+
+### Metadata search
+
+The publication catalogue supports title text and normalized author, keyword, journal, year, and language filters.
+
+### Semantic search
+
+Semantic search stores normalized publication embeddings in PostgreSQL using pgvector cosine distance. Generate missing embeddings with:
+
+```powershell
+docker compose exec api python scripts/generate_publication_embeddings.py --source aau-etd
+```
+
+Model loading can be CPU- and memory-intensive. Interactive query embeddings currently use the configured embedding model; bulk generation belongs on the `ai_embeddings` Celery queue in scaled deployments.
+
+See [docs/SEMANTIC_SEARCH.md](docs/SEMANTIC_SEARCH.md).
+
+### AI research assistant
+
+The assistant retrieves relevant publication metadata and abstracts, produces grounded answers, and returns supporting sources. Local deterministic providers are the safe default. Optional Ollama or OpenAI-compatible providers must be explicitly enabled through environment settings.
+
+AI output should be treated as research assistance, not authoritative scholarly evidence. Users should verify cited publications and original documents.
+
+See [docs/AI_RESEARCH_INTELLIGENCE.md](docs/AI_RESEARCH_INTELLIGENCE.md).
+
+## Authentication and administration
+
+Create an initial administrator inside the API container:
+
+```powershell
+docker compose exec api python scripts/create_admin_user.py `
+  --email admin@example.edu.et `
+  --username admin `
+  --full-name "ResearchHub Administrator" `
+  --password "replace-with-a-strong-temporary-password"
+```
+
+The current bootstrap script requires `--password`; command-line arguments may be retained in shell history. Use it only for local bootstrap, rotate the password immediately, and prefer a secret-injection workflow before production deployment. Consult the script help with:
+
+```powershell
+docker compose exec api python scripts/create_admin_user.py --help
+```
+
+Production deployments must replace `RESEARCHHUB_AUTH_JWT_SECRET` with a strong secret of at least 32 random characters and must restrict CORS origins.
+
+See [docs/AUTHENTICATION.md](docs/AUTHENTICATION.md).
+
+## Health and observability
+
+| Endpoint | Meaning |
+|---|---|
+| `/health/live` | Process liveness; does not depend on external services |
+| `/health/ready` | Readiness based on required PostgreSQL and Redis dependencies |
+| `/health/dependencies` | Dependency status details |
+| `/health/metrics-summary` | Database-pool summary for the current API instance |
+| `/metrics` | Prometheus-compatible metrics |
+
+Start the observability profile:
+
+```powershell
+docker compose --profile observability up -d prometheus grafana
+```
+
+Open:
+
+- Prometheus: <http://localhost:9090>
+- Prometheus targets: <http://localhost:9090/targets>
+- Grafana: <http://localhost:3001>
+- Development Grafana login: `admin` / `researchhub`
+
+Example PromQL:
+
+```promql
+researchhub_api_up
+researchhub_db_pool_size
+researchhub_db_pool_checked_out
+researchhub_db_pool_overflow
+```
+
+Change development credentials before exposing Grafana outside a trusted local environment.
+
+## Scaling and optional profiles
+
+### API replicas
+
+Nginx owns host API port `8111`; API containers expose port 8111 only inside the Compose network. This permits horizontal API scaling:
+
+```powershell
+docker compose up -d --scale api=3
+```
+
+### Isolated workers
+
+```powershell
+docker compose --profile scaling up -d
+docker compose --profile ai up -d
+```
+
+Queues include `harvest`, `imports`, `ai_embeddings`, `ai_generation`, `ai_analysis`, `ai_chat`, `documents`, `notifications`, and `maintenance`. Recalculate database and Redis connection budgets before increasing worker concurrency.
+
+### PgBouncer
+
+```powershell
+docker compose --profile pgbouncer up -d pgbouncer
+```
+
+When using transaction pooling, point the application database URLs at `pgbouncer:5432`, set `RESEARCHHUB_DB_USE_PGBOUNCER=true`, and run Alembic migrations directly against PostgreSQL.
+
+The connection-budget formula is:
+
+```text
+total_possible_connections =
+  api_instances × (DB_POOL_SIZE + DB_MAX_OVERFLOW)
+  + celery_processes × celery_pool_capacity
+  + scheduler_connections
+  + migration_connections
+  + administrative_reserve
+```
+
+See [docs/architecture/database-pooling.md](docs/architecture/database-pooling.md) and [docs/operations/scaling.md](docs/operations/scaling.md).
+
+## Configuration
+
+All backend settings use the `RESEARCHHUB_` prefix and are typed by Pydantic Settings. Start from [.env.example](.env.example).
+
+Important groups:
+
+- `DATABASE_URL`, `DB_POOL_*`, and database timeout settings
+- `REDIS_URL`, connection limits, socket timeouts, and cache TTL
+- `HARVEST_*`, global job capacity, batch size, retry, and request timeout
+- `IMPORT_*`, storage path, upload limit, and preview count
+- `AUTH_*`, JWT lifecycle, failed-login limits, and recovery-token lifetime
+- `AI_*`, provider selection, model names, context limits, and feature flags
+- `HTTP_*`, shared outbound-client limits and timeouts
+- `CELERY_*`, task time limits and prefetch behavior
+- `METRICS_*` and `LOAD_TEST_MODE`
+
+Never commit real API keys, production passwords, JWT secrets, or private repository credentials.
+
+## Development without Docker
+
+### Backend
+
+```powershell
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+python -m pip install --upgrade pip
+python -m pip install -e ".[ai,test]"
+uvicorn researchhub.main:app --host 0.0.0.0 --port 8111 --reload
+```
+
+Host-based settings must use `localhost` for PostgreSQL and Redis rather than Docker service names.
+
+### Frontend
+
+```powershell
+Set-Location frontend
+npm.cmd ci
+npm.cmd run dev
+```
+
+If PowerShell blocks `npm.ps1`, use `npm.cmd` as shown. The default Next.js rewrite targets `http://localhost:8111` outside Docker.
+
+## Testing and quality checks
+
+### Backend
+
+```powershell
+ruff check .
+mypy backend harvester ai
+pytest
+alembic -c backend/alembic.ini heads
+```
+
+Using the existing API image:
+
+```powershell
+docker compose run --rm -v "${PWD}/tests:/app/tests:ro" api pytest -q tests
+```
+
+### Frontend
+
+```powershell
+Set-Location frontend
+npm.cmd run lint
+npm.cmd run type-check
+npm.cmd test -- --run
+npm.cmd run build
+```
+
+### Docker configuration
+
+```powershell
+docker compose config --quiet
+docker compose --profile scaling --profile ai --profile observability --profile pgbouncer config --quiet
+```
+
+## Load testing
+
+The Locust workload is intentionally non-destructive by default. Use a dedicated database and enable load-test mode:
+
+```powershell
+python -m pip install -r load-tests/requirements.txt
+$env:RESEARCHHUB_LOAD_TEST_MODE = "true"
+locust -f load-tests/locustfile.py `
+  --headless `
+  --users 5 `
+  --spawn-rate 1 `
+  --run-time 2m `
+  --host http://localhost:8111 `
+  --csv load-tests/reports/smoke
+```
+
+Progress through smoke, baseline, normal, high, target, stress, spike, soak, and recovery stages only in an isolated environment. Record hardware, replicas, active users, throughput, latency percentiles, error rate, pool utilization, queue depth, and resource usage.
+
+The current report template explicitly records **not yet measured** until real results are supplied: [docs/performance/load-test-report.md](docs/performance/load-test-report.md).
+
+## Troubleshooting
+
+### Frontend reports that the API is unavailable
+
+```powershell
+docker compose ps
+docker compose logs api --tail=100
+docker compose exec api python -c "import urllib.request; print(urllib.request.urlopen('http://localhost:8111/health/ready').read())"
+```
+
+Inside Docker, the API hostname is `api`; in a browser or host process it is `localhost`.
+
+### Large upload fails or returns 500/413
+
+- Confirm `RESEARCHHUB_IMPORT_MAX_FILE_SIZE_MB` allows the file.
+- Keep `experimental.proxyClientMaxBodySize` in `frontend/next.config.ts` above the backend limit for multipart overhead.
+- Restart the frontend after changing Next.js configuration.
+- Inspect both `docker compose logs frontend` and `docker compose logs api`.
+
+### Harvest fails after backend code changes
+
+Restart Celery so it loads the updated code:
+
+```powershell
+docker compose restart worker
+docker compose logs worker --since=30s
+```
+
+### Duplicate source slug or endpoint
+
+Removed sources with history are archived to preserve provenance. Creating the same slug or endpoint restores the archived connector instead of discarding its history.
+
+### Next.js dependency corruption
+
+If `next` reports missing internal modules, remove and reinstall only frontend dependencies rather than changing application code:
+
+```powershell
+Set-Location frontend
+Remove-Item -Recurse -Force node_modules
+npm.cmd ci
+```
+
+## Security notes
+
+- Development passwords and ports in Compose are not production defaults.
+- Terminate TLS at a trusted reverse proxy or ingress.
+- Restrict CORS and trusted proxy headers.
+- Protect administrative, source-management, import, and AI-generation endpoints with appropriate roles and permissions before public exposure.
+- Store secrets in a secret manager rather than `.env` in production.
+- Scan uploads, enforce object-storage policies, and back up PostgreSQL and uploaded documents.
+- Do not weaken Argon2 or authorization checks to improve benchmark numbers.
+
+## Documentation index
+
+- [Architecture](docs/ARCHITECTURE.md)
+- [Scalability](docs/architecture/scalability.md)
+- [Concurrency control](docs/architecture/concurrency-control.md)
+- [Database pooling](docs/architecture/database-pooling.md)
+- [Caching](docs/architecture/caching.md)
+- [Background workers](docs/architecture/background-workers.md)
+- [Authentication](docs/AUTHENTICATION.md)
+- [Source management](docs/SOURCE_MANAGEMENT.md)
+- [Harvesting](docs/HARVESTING.md)
+- [Connectors](docs/CONNECTORS.md)
+- [Metadata quality](docs/METADATA_QUALITY.md)
+- [Semantic search](docs/SEMANTIC_SEARCH.md)
+- [AI research intelligence](docs/AI_RESEARCH_INTELLIGENCE.md)
+- [Observability](docs/operations/observability.md)
+- [Load testing](docs/operations/load-testing.md)
+- [Capacity planning](docs/operations/capacity-planning.md)
+- [Scaling operations](docs/operations/scaling.md)
+- [Failure recovery](docs/operations/failure-recovery.md)
+
+## Contributing
+
+1. Create a focused branch.
+2. Preserve existing APIs unless a migration is documented.
+3. Add tests for bug fixes and concurrency-sensitive changes.
+4. Run backend and frontend validation.
+5. Document schema, environment, operational, or user-facing workflow changes.
+6. Do not commit generated datasets, secrets, model caches, build output, or local volumes.
+
