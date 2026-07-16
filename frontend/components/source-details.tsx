@@ -29,6 +29,7 @@ export function SourceDetails({ id }: { id: string }) {
     name: string;
     description: string;
     base_url: string;
+    api_url: string;
     oai_endpoint: string;
     metadata_prefix: string;
     set_spec: string;
@@ -119,6 +120,7 @@ export function SourceDetails({ id }: { id: string }) {
       name: item.name,
       description: item.description || "",
       base_url: item.base_url || "",
+      api_url: item.api_url || "",
       oai_endpoint: item.oai_endpoint || "",
       metadata_prefix: item.metadata_prefix,
       set_spec: item.set_spec || "",
@@ -132,6 +134,7 @@ export function SourceDetails({ id }: { id: string }) {
       name: editForm.name.trim(),
       description: editForm.description.trim() || null,
       base_url: editForm.base_url.trim() || null,
+      api_url: editForm.api_url.trim() || null,
       oai_endpoint: editForm.oai_endpoint.trim() || null,
       metadata_prefix: editForm.metadata_prefix.trim(),
       set_spec: editForm.set_spec.trim() || null,
@@ -155,7 +158,10 @@ export function SourceDetails({ id }: { id: string }) {
             </p>
             <h1 className="mt-2 font-serif text-3xl font-bold">{item.name}</h1>
             <p className="mt-2 text-sm text-stone-500">
-              {item.oai_endpoint || item.base_url || "Manual import source"}
+              {item.oai_endpoint ||
+                item.api_url ||
+                item.base_url ||
+                "Manual import source"}
             </p>
           </div>
           <span className="rounded-full bg-stone-100 px-3 py-1 text-sm font-semibold capitalize dark:bg-stone-800">
@@ -232,6 +238,12 @@ export function SourceDetails({ id }: { id: string }) {
               onChange={(oai_endpoint) =>
                 setEditForm({ ...editForm, oai_endpoint })
               }
+            />
+            <SourceField
+              label="DSpace Discovery API endpoint"
+              value={editForm.api_url}
+              type="url"
+              onChange={(api_url) => setEditForm({ ...editForm, api_url })}
             />
             <SourceField
               label="Metadata prefix"

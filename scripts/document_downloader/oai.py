@@ -3,7 +3,6 @@ from __future__ import annotations
 import logging
 import xml.etree.ElementTree as ET
 from collections.abc import Iterator
-from urllib.parse import urlparse
 
 from .http_client import ResilientHttpClient
 from .models import Publication, SourceConfig

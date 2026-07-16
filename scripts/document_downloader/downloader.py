@@ -20,8 +20,8 @@ from .dspace7 import (
 from .http_client import ResilientHttpClient
 from .manifest import ManifestManager
 from .models import (
-    DownloadResult,
     DocumentCandidate,
+    DownloadResult,
     Publication,
     SourceConfig,
 )

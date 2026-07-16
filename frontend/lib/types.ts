@@ -52,6 +52,7 @@ export interface University {
 export type SourceType =
   | "oai_pmh"
   | "dspace_oai"
+  | "dspace_discovery"
   | "ojs_oai"
   | "xml_import"
   | "json_import"
@@ -92,6 +93,7 @@ export interface SourceCreate {
   source_type: SourceType;
   description?: string;
   base_url?: string;
+  api_url?: string;
   oai_endpoint?: string;
   metadata_prefix: string;
   set_spec?: string;
@@ -231,18 +233,51 @@ export interface PublicationSimilarityResponse {
   model: string;
   count: number;
   results: SimilarPublicationResult[];
+  status: "ready" | "embedding_required";
+  message: string | null;
+  minimum_similarity: number | null;
 }
 
 export interface PublicationSummary {
-  id: string;
+  id: string | null;
   publication_id: string;
   summary_type: string;
-  summary_text: string;
-  model_name: string;
+  summary_text: string | null;
+  summary: string | null;
+  model_name: string | null;
   source_fields: string[];
   confidence_score: string | null;
   is_verified: boolean;
-  generated_at: string;
+  generated_at: string | null;
+  status: "ready" | "processing" | "unavailable";
+  summary_source:
+    | "full_text"
+    | "downloaded_document"
+    | "newly_downloaded_document"
+    | "abstract"
+    | "metadata"
+    | "unavailable";
+  summary_style: string;
+  research_document_id: string | null;
+  document_status: string | null;
+  pages_used: number[];
+  chunk_count: number;
+  provider: string | null;
+  cached: boolean;
+  warnings: string[];
+  processing_job_id: string | null;
+  message: string | null;
+}
+
+export interface EmbeddingAdministrationStatus {
+  total_publications: number;
+  embedded_publications: number;
+  missing_embeddings: number;
+  stale_embeddings: number;
+  failed_embeddings: number;
+  embedding_model: string;
+  vector_dimension: number;
+  queue: string;
 }
 
 export interface AIKeyword {
@@ -261,4 +296,53 @@ export interface PublicationCitation {
   citation_text: string;
   metadata_version: string;
   is_verified: boolean;
+}
+
+export interface Researcher {
+  id: string;
+  full_name: string;
+  normalized_name: string | null;
+  orcid: string | null;
+  affiliation: string | null;
+}
+
+export interface QualitySummary {
+  total_reports: number;
+  assessed_publications: number;
+  active_publications: number;
+  deleted_publications: number;
+  average_final_score: string;
+  grade_distribution: Record<string, number>;
+  dimension_averages: Record<string, string>;
+  generated_at: string;
+  ruleset_version: string;
+}
+
+export interface QualityIssue {
+  publication_id: string;
+  report_id: string;
+  grade: string;
+  final_score: string;
+  issue_type: string;
+  category: string;
+  message: string;
+  assessed_at: string;
+}
+
+export interface QualityIssuePage {
+  items: QualityIssue[];
+  total: number;
+  limit: number;
+  offset: number;
+}
+
+export interface SystemHealth {
+  status: "ok" | "degraded";
+  instance_id: string;
+  checks: Record<string, string>;
+}
+
+export interface AuthorizationMatrix {
+  roles: Record<string, string[]>;
+  permissions: string[];
 }

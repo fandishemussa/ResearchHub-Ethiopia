@@ -2,11 +2,16 @@
 
 from fastapi import APIRouter, Depends, Query
 
-from researchhub.api.v1.dependencies import get_catalog_service
+from researchhub.api.v1.dependencies import get_catalog_service, require_permission
 from researchhub.application.services import CatalogService
+from researchhub.core.permissions import Permissions
 from researchhub.domain.schemas import AuthorRead
 
-router = APIRouter(prefix="/authors", tags=["authors"])
+router = APIRouter(
+    prefix="/authors",
+    tags=["authors"],
+    dependencies=[Depends(require_permission(Permissions.PUBLICATIONS_READ))],
+)
 
 
 @router.get("", response_model=list[AuthorRead])
@@ -19,4 +24,3 @@ async def list_authors(
 
     authors = await service.list_authors(limit=limit, offset=offset)
     return [AuthorRead.model_validate(item) for item in authors]
-

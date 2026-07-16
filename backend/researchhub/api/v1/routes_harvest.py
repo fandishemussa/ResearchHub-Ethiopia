@@ -4,10 +4,15 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 
-from researchhub.api.v1.dependencies import get_connector_service, get_harvest_operations_service
+from researchhub.api.v1.dependencies import (
+    get_connector_service,
+    get_harvest_operations_service,
+    require_permission,
+)
 from researchhub.application.harvest_operations import HarvestOperationsService
 from researchhub.application.services import ConnectorService
 from researchhub.application.worker import run_source_harvest
+from researchhub.core.permissions import Permissions
 from researchhub.domain.schemas import (
     HarvestEventRead,
     HarvestFailureRead,
@@ -16,10 +21,17 @@ from researchhub.domain.schemas import (
     HarvestRequest,
 )
 
-router = APIRouter(prefix="/harvest", tags=["harvest"])
+router = APIRouter(
+    prefix="/harvest",
+    tags=["harvest"],
+    dependencies=[Depends(require_permission(Permissions.SOURCES_READ))],
+)
 
 
-@router.post("/jobs", response_model=HarvestJobRead, status_code=202)
+@router.post(
+    "/jobs", response_model=HarvestJobRead, status_code=202,
+    dependencies=[Depends(require_permission(Permissions.HARVEST_START))],
+)
 async def queue_harvest(
     payload: HarvestRequest,
     service: ConnectorService = Depends(get_connector_service),
@@ -53,7 +65,10 @@ async def get_harvest_job(
     return HarvestJobDetail.model_validate(item)
 
 
-@router.post("/jobs/{job_id}/cancel", response_model=HarvestJobDetail)
+@router.post(
+    "/jobs/{job_id}/cancel", response_model=HarvestJobDetail,
+    dependencies=[Depends(require_permission(Permissions.HARVEST_CANCEL))],
+)
 async def cancel_harvest_job(
     job_id: UUID, service: HarvestOperationsService = Depends(get_harvest_operations_service)
 ) -> HarvestJobDetail:
@@ -79,7 +94,9 @@ async def _retry(
 
 
 @router.post(
-    "/jobs/{job_id}/retry", response_model=HarvestJobDetail, status_code=status.HTTP_202_ACCEPTED
+    "/jobs/{job_id}/retry", response_model=HarvestJobDetail,
+    status_code=status.HTTP_202_ACCEPTED,
+    dependencies=[Depends(require_permission(Permissions.HARVEST_START))],
 )
 async def retry_harvest_job(
     job_id: UUID, service: HarvestOperationsService = Depends(get_harvest_operations_service)
@@ -91,6 +108,7 @@ async def retry_harvest_job(
     "/jobs/{job_id}/retry-failed",
     response_model=HarvestJobDetail,
     status_code=status.HTTP_202_ACCEPTED,
+    dependencies=[Depends(require_permission(Permissions.HARVEST_START))],
 )
 async def retry_failed_harvest(
     job_id: UUID, service: HarvestOperationsService = Depends(get_harvest_operations_service)
@@ -99,7 +117,9 @@ async def retry_failed_harvest(
 
 
 @router.post(
-    "/jobs/{job_id}/resume", response_model=HarvestJobDetail, status_code=status.HTTP_202_ACCEPTED
+    "/jobs/{job_id}/resume", response_model=HarvestJobDetail,
+    status_code=status.HTTP_202_ACCEPTED,
+    dependencies=[Depends(require_permission(Permissions.HARVEST_START))],
 )
 async def resume_harvest_job(
     job_id: UUID, service: HarvestOperationsService = Depends(get_harvest_operations_service)

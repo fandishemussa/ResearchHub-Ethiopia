@@ -136,3 +136,25 @@ describe("deleteSource", () => {
     );
   });
 });
+
+describe("systemHealth", () => {
+  it("uses the non-API health proxy and preserves degraded status", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          status: "degraded",
+          instance_id: "api-1",
+          checks: { postgres: "ok", redis: "unavailable" },
+        }),
+        { status: 503 },
+      ),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    const { api } = await import("./api");
+    await expect(api.systemHealth()).resolves.toMatchObject({
+      status: "degraded",
+      checks: { postgres: "ok", redis: "unavailable" },
+    });
+    expect(fetchMock.mock.calls[0][0]).toBe("/backend-health/dependencies");
+  });
+});

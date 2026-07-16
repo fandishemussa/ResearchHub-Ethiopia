@@ -5,8 +5,9 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import FileResponse
 
-from researchhub.api.v1.dependencies import get_research_document_service
+from researchhub.api.v1.dependencies import get_research_document_service, require_permission
 from researchhub.application.documents import ResearchDocumentService
+from researchhub.core.permissions import Permissions
 from researchhub.domain.schemas import (
     DocumentChunkPage,
     DocumentChunkRead,
@@ -14,7 +15,11 @@ from researchhub.domain.schemas import (
     ResearchDocumentRead,
 )
 
-router = APIRouter(prefix="/documents", tags=["research-documents"])
+router = APIRouter(
+    prefix="/documents",
+    tags=["research-documents"],
+    dependencies=[Depends(require_permission(Permissions.DOCUMENTS_READ))],
+)
 
 
 @router.get("", response_model=ResearchDocumentPage)
@@ -78,7 +83,11 @@ async def list_document_chunks(
     )
 
 
-@router.get("/{document_id}/content", response_class=FileResponse)
+@router.get(
+    "/{document_id}/content",
+    response_class=FileResponse,
+    dependencies=[Depends(require_permission(Permissions.DOCUMENTS_DOWNLOAD))],
+)
 async def document_content(
     document_id: UUID,
     page: int | None = Query(default=None, ge=1, le=100_000),

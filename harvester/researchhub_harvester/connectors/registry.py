@@ -3,6 +3,7 @@
 from collections.abc import Callable
 
 from researchhub_harvester.connectors.base import ConnectorConfig, MetadataConnector
+from researchhub_harvester.connectors.dspace_discovery import DSpaceDiscoveryConnector
 from researchhub_harvester.connectors.oai_pmh import OAIPMHConnector
 from researchhub_harvester.connectors.placeholders import (
     CrossrefConnector,
@@ -16,6 +17,8 @@ ConnectorFactory = Callable[[ConnectorConfig], MetadataConnector]
 
 CONNECTORS: dict[str, type[MetadataConnector]] = {
     "oai-pmh": OAIPMHConnector,
+    "dspace-discovery": DSpaceDiscoveryConnector,
+    "dspace_discovery": DSpaceDiscoveryConnector,
     "openalex": OpenAlexConnector,
     "crossref": CrossrefConnector,
     "datacite": DataCiteConnector,
@@ -32,4 +35,3 @@ def create_connector(connector_type: str, config: ConnectorConfig) -> MetadataCo
         msg = f"Unsupported connector type: {connector_type}"
         raise ValueError(msg) from exc
     return connector_cls(config)
-

@@ -9,6 +9,7 @@ from typing import Any
 from uuid import UUID
 
 from researchhub_harvester.connectors.base import ConnectorConfig
+from researchhub_harvester.connectors.dspace_discovery import DSpaceDiscoveryConnector
 from researchhub_harvester.connectors.oai_pmh import OAIPMHConnector
 from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -25,6 +26,7 @@ from researchhub.infrastructure.persistence.models import (
 )
 
 OAI_TYPES = {"oai_pmh", "dspace_oai", "ojs_oai"}
+DISCOVERY_TYPES = {"dspace_discovery"}
 SECRET_KEYS = {"api_key", "password", "secret", "token", "authorization"}
 
 
@@ -65,10 +67,24 @@ class SourceManagementService:
         )
         if payload.source_type in OAI_TYPES and payload.oai_endpoint is None:
             raise ValueError("An OAI endpoint is required for this source type")
+        if payload.source_type in DISCOVERY_TYPES and not (payload.api_url or payload.base_url):
+            raise ValueError("A DSpace REST API endpoint is required for this source type")
         endpoint = str(payload.oai_endpoint) if payload.oai_endpoint else None
+        discovery_endpoint = (
+            str(payload.api_url or payload.base_url)
+            if payload.source_type in DISCOVERY_TYPES
+            else None
+        )
         conditions = [Connector.code == payload.slug]
         if endpoint:
             conditions.append(Connector.oai_endpoint == endpoint)
+        if discovery_endpoint:
+            conditions.extend(
+                [
+                    Connector.api_url == discovery_endpoint,
+                    Connector.base_url == discovery_endpoint,
+                ]
+            )
         existing = await self.session.scalar(select(Connector).where(or_(*conditions)))
         if existing is not None and existing.status != "removed":
             raise ValueError("A source with this slug or endpoint already exists")
@@ -104,15 +120,34 @@ class SourceManagementService:
         if source is None:
             raise LookupError("Source not found")
         values = payload.model_dump(exclude_unset=True)
-        endpoint_changed = "oai_endpoint" in values
+        endpoint_changed = bool({"oai_endpoint", "api_url", "base_url"} & values.keys())
         prospective_endpoint = values.get("oai_endpoint", source.oai_endpoint)
         if source.connector_type in OAI_TYPES and prospective_endpoint is None:
             raise ValueError("An OAI endpoint is required for this source type")
+        prospective_discovery_endpoint = values.get(
+            "api_url", source.api_url
+        ) or values.get("base_url", source.base_url)
+        if source.connector_type in DISCOVERY_TYPES and prospective_discovery_endpoint is None:
+            raise ValueError("A DSpace REST API endpoint is required for this source type")
         if prospective_endpoint is not None:
             endpoint = str(prospective_endpoint)
             duplicate = await self.session.scalar(
                 select(Connector.id).where(
                     Connector.oai_endpoint == endpoint,
+                    Connector.id != source_id,
+                    Connector.status != "removed",
+                )
+            )
+            if duplicate is not None:
+                raise ValueError("A source with this endpoint already exists")
+        if source.connector_type in DISCOVERY_TYPES and prospective_discovery_endpoint is not None:
+            discovery_endpoint = str(prospective_discovery_endpoint)
+            duplicate = await self.session.scalar(
+                select(Connector.id).where(
+                    or_(
+                        Connector.api_url == discovery_endpoint,
+                        Connector.base_url == discovery_endpoint,
+                    ),
                     Connector.id != source_id,
                     Connector.status != "removed",
                 )
@@ -226,7 +261,7 @@ class SourceManagementService:
             source.connector_type,
             source.code,
             source.name,
-            source.oai_endpoint or source.base_url,
+            source.oai_endpoint or source.api_url or source.base_url,
             source.metadata_prefix,
             source.set_spec,
         )
@@ -293,6 +328,55 @@ async def test_source_configuration(
     set_spec: str | None,
 ) -> dict[str, Any]:
     source_type = source_type.replace("-", "_")
+    if source_type in DISCOVERY_TYPES:
+        if not endpoint:
+            raise ValueError("A DSpace REST API endpoint is required")
+        connector = DSpaceDiscoveryConnector(
+            ConnectorConfig(
+                code=code,
+                name=name,
+                base_url=endpoint,
+                source_type=source_type,
+            )
+        )
+        started = perf_counter()
+        try:
+            identify = await connector.identify()
+            total = int(identify.get("totalElements") or 0)
+            return {
+                "success": True,
+                "response_time_ms": round((perf_counter() - started) * 1000),
+                "repository_name": identify.get("repositoryName") or name,
+                "protocol_version": identify.get("protocolVersion"),
+                "admin_emails": [],
+                "earliest_datestamp": None,
+                "deletion_policy": "Discovery API does not expose deletion tombstones",
+                "supported_metadata_formats": ["dspace_dc"],
+                "supported_sets": [],
+                "sample_record_count": min(total, 1),
+                "warnings": [
+                    f"Discovery index reports {total:,} records.",
+                    "Incremental harvest uses item lastModified timestamps; deletion tombstones are unavailable.",
+                ],
+                "errors": [],
+            }
+        except Exception as exc:  # noqa: BLE001 - stable connection-test response.
+            return {
+                "success": False,
+                "response_time_ms": round((perf_counter() - started) * 1000),
+                "repository_name": name,
+                "protocol_version": "DSpace REST Discovery",
+                "admin_emails": [],
+                "earliest_datestamp": None,
+                "deletion_policy": None,
+                "supported_metadata_formats": [],
+                "supported_sets": [],
+                "sample_record_count": 0,
+                "warnings": [],
+                "errors": [str(exc)],
+            }
+        finally:
+            await connector.aclose()
     if source_type not in OAI_TYPES:
         return {
             "success": True,

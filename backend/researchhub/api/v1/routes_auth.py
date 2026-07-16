@@ -7,13 +7,21 @@ from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from fastapi.security import OAuth2PasswordRequestForm
 from redis.asyncio import Redis
 
-from researchhub.api.v1.dependencies import get_authentication_service, require_authenticated_user
+from researchhub.api.v1.dependencies import (
+    get_authentication_service,
+    get_authorization_service,
+    require_authenticated_user,
+    require_permission,
+)
 from researchhub.application.auth import (
     AccountLockedError,
     AuthenticationError,
     AuthenticationService,
 )
+from researchhub.application.authorization import AuthorizationService
+from researchhub.core.permissions import ROLE_PERMISSIONS, Permissions
 from researchhub.domain.schemas import (
+    AuthorizationMatrixRead,
     EmailVerifyRequest,
     LogoutRequest,
     PasswordChangeRequest,
@@ -96,8 +104,28 @@ async def logout_all(
 
 
 @router.get("/me", response_model=UserRead)
-async def me(user: User = Depends(require_authenticated_user)) -> UserRead:
-    return UserRead.model_validate(user)
+async def me(
+    user: User = Depends(require_authenticated_user),
+    authorization: AuthorizationService = Depends(get_authorization_service),
+) -> UserRead:
+    return UserRead.model_validate(user).model_copy(
+        update={
+            "roles": sorted(await authorization.role_names(user.id)),
+            "permissions": sorted(await authorization.permission_codes(user.id)),
+        }
+    )
+
+
+@router.get(
+    "/authorization-matrix",
+    response_model=AuthorizationMatrixRead,
+    dependencies=[Depends(require_permission(Permissions.ROLES_MANAGE))],
+)
+async def authorization_matrix() -> AuthorizationMatrixRead:
+    return AuthorizationMatrixRead(
+        roles={name: sorted(grants) for name, grants in ROLE_PERMISSIONS.items()},
+        permissions=sorted(Permissions.all()),
+    )
 
 
 @router.get("/sessions", response_model=list[RefreshSessionRead])

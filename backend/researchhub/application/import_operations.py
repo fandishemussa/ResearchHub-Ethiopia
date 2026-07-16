@@ -121,6 +121,13 @@ class ImportOperationsService:
         )
         await self.session.commit()
         await self.session.refresh(job)
+        from researchhub.application.worker import celery_app
+
+        celery_app.send_task(
+            "researchhub.embeddings.generate",
+            kwargs={"source": source.code},
+            task_id=f"import-embeddings-{job.id}",
+        )
         return job
 
     async def preview(self, job_id: UUID) -> dict[str, Any]:
@@ -381,10 +388,9 @@ def _normalize_mapping(row: dict[str, Any], source: Connector) -> NormalizedPubl
     year_text = date_values[0] if date_values else ""
     year = int(year_text[:4]) if year_text[:4].isdigit() else None
     now = datetime.now(UTC)
-    url = (
-        (raw_values("article_url", "url", "landing_page_url", "dc.identifier.uri") or [""])[0]
-        or None
-    )
+    url = (raw_values("article_url", "url", "landing_page_url", "dc.identifier.uri") or [""])[
+        0
+    ] or None
     return NormalizedPublication(
         external_id=str(
             row.get("external_id") or row.get("uuid") or row.get("handle") or ""
@@ -400,7 +406,9 @@ def _normalize_mapping(row: dict[str, Any], source: Connector) -> NormalizedPubl
         publication_year=year,
         keywords=values("keywords") or values("subjects"),
         subjects=values("subjects"),
-        language=(raw_values("language", "languages", "dc.language", "dc.language.iso") or [None])[0],
+        language=(raw_values("language", "languages", "dc.language", "dc.language.iso") or [None])[
+            0
+        ],
         doi=(raw_values("doi", "dc.identifier.doi") or [None])[0],
         orcid=None,
         issn=None,

@@ -5,12 +5,17 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 
-from researchhub.api.v1.dependencies import get_publication_service
+from researchhub.api.v1.dependencies import get_publication_service, require_permission
 from researchhub.application.services import PublicationService
+from researchhub.core.permissions import Permissions
 from researchhub.domain.schemas import PublicationCreate, PublicationRead
 from researchhub.infrastructure.persistence.models import Publication
 
-router = APIRouter(prefix="/publications", tags=["publications"])
+router = APIRouter(
+    prefix="/publications",
+    tags=["publications"],
+    dependencies=[Depends(require_permission(Permissions.PUBLICATIONS_READ))],
+)
 
 
 def publication_response(
@@ -95,7 +100,12 @@ async def get_publication(
     return publication_response(publication)
 
 
-@router.post("", response_model=PublicationRead, status_code=201)
+@router.post(
+    "",
+    response_model=PublicationRead,
+    status_code=201,
+    dependencies=[Depends(require_permission(Permissions.PUBLICATIONS_MANAGE))],
+)
 async def create_publication(
     payload: PublicationCreate,
     service: PublicationService = Depends(get_publication_service),

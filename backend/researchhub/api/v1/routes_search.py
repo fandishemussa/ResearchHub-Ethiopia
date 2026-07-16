@@ -2,9 +2,14 @@
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 
-from researchhub.api.v1.dependencies import get_search_service, get_semantic_search_service
+from researchhub.api.v1.dependencies import (
+    get_search_service,
+    get_semantic_search_service,
+    require_permission,
+)
 from researchhub.api.v1.routes_publications import publication_response
 from researchhub.application.services import SearchService, SemanticSearchService
+from researchhub.core.permissions import Permissions
 from researchhub.domain.schemas import (
     PublicationRead,
     SearchQuery,
@@ -12,7 +17,11 @@ from researchhub.domain.schemas import (
     SemanticSearchResult,
 )
 
-router = APIRouter(prefix="/search", tags=["search"])
+router = APIRouter(
+    prefix="/search",
+    tags=["search"],
+    dependencies=[Depends(require_permission(Permissions.PUBLICATIONS_READ))],
+)
 
 
 @router.get("/publications", response_model=list[PublicationRead])
@@ -67,4 +76,10 @@ async def semantic_search(
         model=service.encoder.get_model_name(),
         count=len(results),
         results=[SemanticSearchResult.model_validate(item) for item in results],
+        ranking_strategy="hybrid",
+        warnings=(
+            ["Vector search was unavailable or had no matches; lexical fallback was used."]
+            if results and all(not item.get("semantic_score") for item in results)
+            else []
+        ),
     )

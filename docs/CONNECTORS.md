@@ -45,6 +45,23 @@ The connector exposes synchronous methods such as `identify_sync`,
 processes. It also preserves async wrappers required by the platform
 `MetadataConnector` contract.
 
+### DSpace REST Discovery
+
+The DSpace Discovery connector supports DSpace 7 HAL responses from
+`/server/api/discover/search/objects`:
+
+- API-base or full-search URL normalization
+- `page`/`size` pagination controlled by ResearchHub
+- configurable page size with retry and exponential backoff
+- full harvest and maximum-record dry runs
+- incremental filtering through item `lastModified`
+- embedded Dublin Core metadata and locale normalization
+- canonical publication validation, deduplication, provenance, and quality scoring
+
+The default page size is 25 because public DSpace installations can produce large HAL documents.
+Provider-specific `connection_config.page_size` may tune it from 1 to 100. DSpace Discovery results
+do not provide deleted-item tombstones; this connector therefore cannot infer every remote deletion.
+
 ## Registered Extension Points
 
 The following connectors are registered as configuration targets and intentionally

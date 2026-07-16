@@ -1,8 +1,12 @@
 # ResearchHub Ethiopia
 
+> Full-text research intelligence and semantic retrieval are operational workflows, not UI-only features. See [the implementation audit](docs/full-text-summary-and-semantic-search-audit.md), [AI intelligence](docs/AI_RESEARCH_INTELLIGENCE.md), and [semantic search](docs/SEMANTIC_SEARCH.md) for decision flows, security controls, repair procedures, and current evidence limits.
+
+> Local AI operators: see [Ollama context management](docs/OLLAMA_CONTEXT_MANAGEMENT.md) for the 16 GB laptop profile, dynamic RAG budgeting, memory guard, and benchmark commands.
+
 ResearchHub Ethiopia is an AI-assisted research information management platform for aggregating, normalizing, searching, and analysing scholarly output from Ethiopian universities.
 
-It connects institutional repositories through OAI-PMH or validated file imports, preserves metadata provenance, supports semantic discovery with PostgreSQL and pgvector, and provides operational workflows for harvesting, import review, research intelligence, and repository health monitoring.
+It connects institutional repositories through OAI-PMH, DSpace REST Discovery, or validated file imports, preserves metadata provenance, supports semantic discovery with PostgreSQL and pgvector, and provides operational workflows for harvesting, import review, research intelligence, and repository health monitoring.
 
 > **Project status:** active development. The architecture includes scalability and observability foundations, but no production-capacity claim—including support for 1,000 concurrent users—is made without repeatable load-test evidence on documented hardware.
 
@@ -19,25 +23,27 @@ It connects institutional repositories through OAI-PMH or validated file imports
 
 ## Feature maturity
 
-The table separates working functionality from foundations and staged enhancements. “Implemented” means the code path exists; it does not by itself mean production hardening or capacity has been proven.
+The table uses the evidence rules in the [enterprise prototype audit](docs/enterprise-prototype-audit.md). A route, model, or screen alone is not treated as fully verified, and runtime-dependent claims remain pending until exercised on the target stack.
 
-| Area                          | Status                 | Current capability                                                                                                                                                                |
-| ----------------------------- | ---------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Managed sources               | Implemented            | Add, edit, test, enable, disable, remove/archive, and restore OAI-PMH sources                                                                                                     |
-| Harvesting                    | Implemented            | Dry-run, full and incremental modes, checkpoints, retries, cancellation, events, failures, and progress                                                                           |
-| Metadata imports              | Implemented            | XML, JSON, and CSV upload, validation preview, progress, confirmation, cancellation, and partial-row tolerance                                                                    |
-| Catalogue                     | Implemented            | Universities, publications, authors, source provenance, details, filters, and dashboard summaries                                                                                 |
-| Semantic discovery            | Implemented            | Publication embeddings, pgvector similarity search, explainable related-publication results                                                                                       |
-| Full-text RAG foundation      | Implemented            | Registered PDFs, extraction, chunking, 384-dimensional chunk embeddings, secure document access, and chunk browsing                                                               |
-| Research assistant            | Implemented            | Persistent conversations, independently collapsible side panels, scoped hybrid retrieval, grounded answers, rich citations, evidence inspection, follow-ups, feedback, and export |
-| Research intelligence         | Implemented foundation | Summaries, keywords, formatted citations, duplicate candidates, and trend APIs; quality depends on available metadata/models                                                      |
-| Authentication                | Security foundation    | Password/token/session primitives exist; public deployment still requires complete role enforcement and operational hardening                                                     |
-| Observability                 | Implemented foundation | Health checks, structured logs, Prometheus metrics, Grafana provisioning, and load-test workloads                                                                                 |
-| Comparison/workspace/admin UI | Planned                | Research comparison, saved collections, expanded indexing administration, and AI status interfaces remain staged                                                                  |
+| Area                         | Status                 | Current capability                                                                                                                                              |
+| ---------------------------- | ---------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Managed sources              | PARTIALLY_IMPLEMENTED  | CRUD, connection test, enable/disable, health, history, harvest and import exist; archive/restore and schedule/rate-limit UX remain incomplete                  |
+| Harvesting                   | PARTIALLY_IMPLEMENTED  | Dry-run, full/incremental modes, checkpoints, retries, cancellation, events, failures and progress exist; live long-run validation is pending                   |
+| Metadata imports             | PARTIALLY_IMPLEMENTED  | XML/JSON/CSV upload, byte progress, preview, confirmation, cancellation and duplicate checksum protection exist; dedicated history/failure export is pending    |
+| Catalogue                    | PARTIALLY_IMPLEMENTED  | Universities, publications, normalized authors, provenance, details and dashboard summaries exist; the full enterprise filter/correction contract is incomplete |
+| Semantic discovery           | PARTIALLY_IMPLEMENTED  | 384-dimensional embeddings, pgvector search and related publications exist; representative-corpus relevance is NOT_MEASURED                                     |
+| Full-text RAG foundation     | PARTIALLY_IMPLEMENTED  | Registered PDFs, extraction, chunks, vectors, protected access and browsing exist; restriction policy and full indexing administration are incomplete           |
+| Research assistant           | PARTIALLY_IMPLEMENTED  | Temporary/saved conversations, side panels, grounded citations, evidence, feedback and export exist; live Ollama and restricted-data validation are pending     |
+| Research intelligence        | IMPLEMENTED_FOUNDATION | Summary, keyword, citation, duplicate and trend APIs/persistence exist; complete UI and corpus-level validation remain                                          |
+| Authentication/authorization | PARTIALLY_IMPLEMENTED  | Login UI, Argon2/JWT/refresh foundations and centralized RBAC protect major sensitive routes; complete tenant-scope and admin UI are not finished               |
+| Metadata quality             | IMPLEMENTED_FOUNDATION | Six-dimension scoring, issue APIs and a dashboard exist; assignment/correction/review/approval audit workflow is missing                                        |
+| Researcher directory         | IMPLEMENTED_FOUNDATION | Normalized author search and affiliation/ORCID display exist; verified profiles, claims, CVs and external synchronization are missing                           |
+| Observability                | IMPLEMENTED_FOUNDATION | Health UI/endpoints, structured logs, Prometheus and Grafana configuration exist; deployed targets/alerts require validation                                    |
+| Enterprise admin/audit       | MISSING                | Permission vocabulary exists, but user/role editor, immutable audit log, settings area and complete role-aware navigation remain required                       |
 
 ## Highlights
 
-- **Repository aggregation:** managed OAI-PMH sources, DSpace-compatible metadata, full and incremental harvesting, resumption tokens, checkpoints, retries, cancellation, and job history.
+- **Repository aggregation:** managed OAI-PMH and DSpace REST Discovery sources, DSpace-compatible metadata, full and incremental harvesting, pagination, resumption tokens, checkpoints, retries, cancellation, and job history.
 - **Validated imports:** XML, JSON, and CSV uploads up to the configured limit, browser upload progress, preview-before-confirmation, tolerant row validation, and duplicate-file protection.
 - **National research catalogue:** universities, repositories, publications, authors, journals, keywords, controlled vocabularies, provenance, and metadata history.
 - **Research discovery:** faceted metadata search, pgvector semantic search, publication similarity, safe external links, deterministic result types, and publication details.
@@ -234,6 +240,24 @@ Set specification: leave blank to harvest every exposed set
 
 Do not include `verb`, `metadataPrefix`, or pagination parameters in the saved endpoint. ResearchHub constructs protocol requests itself.
 
+For a DSpace 7 REST Discovery endpoint, select **DSpace REST Discovery API** and enter either
+the API base URL or a complete Discovery search URL:
+
+```text
+Source type:  DSpace REST Discovery API
+API endpoint: https://etd.aau.edu.et/server/api
+```
+
+```text
+https://etd.aau.edu.et/server/api/discover/search/objects?query=%2A
+```
+
+ResearchHub normalizes both forms, removes saved `page` and `size` values, and controls HAL
+pagination itself. Full harvest traverses every indexed item. Incremental harvest filters items by
+their DSpace `lastModified` timestamp from the last successful harvest date. DSpace Discovery does
+not expose OAI-style deletion tombstones, so remote deletions require a separate reconciliation
+policy; use DSpace OAI when authoritative deletion tracking is required.
+
 Available workflows include:
 
 - **Test connection:** identify the repository and validate metadata-format support.
@@ -407,10 +431,14 @@ Keep retrieval grounding enabled even when using a stronger model. A fluent answ
 | `/documents`              | Indexed full-text document catalogue                   |
 | `/documents/[documentId]` | Secure PDF preview and chunk browser                   |
 | `/universities`           | Ethiopian university catalogue                         |
+| `/researchers`            | Normalized researcher/author directory                 |
 | `/repositories`           | Managed source catalogue                               |
 | `/repositories/new`       | Source configuration and connection testing            |
 | `/repositories/[id]`      | Harvest, import, edit, disable, and removal workflows  |
 | `/harvest/jobs/[id]`      | Job progress, events, counters, and record failures    |
+| `/admin/metadata-quality` | Metadata quality summary and current issues            |
+| `/admin/system-health`    | Live API dependency health                             |
+| `/login`                  | Tab-scoped authenticated prototype session             |
 
 The complete interactive API contract is available through OpenAPI at <http://localhost:8111/docs>. Principal API groups are `/api/sources`, `/api/harvest`, `/api/import`, `/api/publications`, `/api/search`, `/api/documents`, `/api/ai`, `/api/dashboard`, `/api/quality`, `/api/auth`, and `/api/universities`.
 
@@ -422,11 +450,10 @@ Create an initial administrator inside the API container:
 docker compose exec api python scripts/create_admin_user.py `
   --email admin@example.edu.et `
   --username admin `
-  --full-name "ResearchHub Administrator" `
-  --password "replace-with-a-strong-temporary-password"
+  --full-name "ResearchHub Administrator"
 ```
 
-The current bootstrap script requires `--password`; command-line arguments may be retained in shell history. Use it only for local bootstrap, rotate the password immediately, and prefer a secret-injection workflow before production deployment. Consult the script help with:
+The command prompts for a password without echoing it, seeds the canonical role/permission matrix, and assigns `PLATFORM_ADMIN`. Automation may inject `RESEARCHHUB_ADMIN_PASSWORD` through an approved secret store. Do not put passwords in shell arguments or source control. Consult the script help with:
 
 ```powershell
 docker compose exec api python scripts/create_admin_user.py --help
@@ -694,14 +721,16 @@ Do not edit previously applied migration files to repair a deployed database. Ad
 
 Back up both PostgreSQL and the document/import data mount. A database-only backup cannot restore registered PDFs, while a file-only backup cannot restore provenance, sessions, jobs, or document UUIDs.
 
-Example local database backup:
+Safe database and document backup workflow:
 
 ```powershell
-New-Item -ItemType Directory -Force backups | Out-Null
-docker compose exec -T postgres pg_dump -U researchhub -d researchhub -Fc > backups/researchhub.dump
+python scripts/backup_database.py --dry-run
+python scripts/backup_database.py --backup-dir D:\ResearchHubBackups\database --retention 7
+python scripts/verify_backup.py D:\ResearchHubBackups\database\researchhub-<timestamp>.dump
+python scripts/backup_documents.py --source data\research-documents --backup-dir D:\ResearchHubBackups\documents
 ```
 
-Copy `./data` using a filesystem-aware backup tool while write-heavy imports and indexing are paused. Test restoration in a separate environment before relying on the backup. Preserve `.env` values through a secret-management system, not inside the backup repository.
+Restore only into an approved isolated target after checksum/archive verification. The guarded restore command requires the exact configured database name and does not silently drop existing objects. Test restoration before relying on a backup. Preserve secrets through secret management, not inside backup archives.
 
 For failure scenarios and recovery sequencing, see [docs/operations/failure-recovery.md](docs/operations/failure-recovery.md).
 
@@ -710,7 +739,7 @@ For failure scenarios and recovery sequencing, see [docs/operations/failure-reco
 - Development passwords and ports in Compose are not production defaults.
 - Terminate TLS at a trusted reverse proxy or ingress.
 - Restrict CORS and trusted proxy headers.
-- Protect administrative, source-management, import, and AI-generation endpoints with appropriate roles and permissions before public exposure.
+- Major administrative, source, harvest, import, document and AI routes are permission-protected. Complete university/department scope enforcement and IDOR tests before multi-tenant or public exposure.
 - Store secrets in a secret manager rather than `.env` in production.
 - Scan uploads, enforce object-storage policies, and back up PostgreSQL and uploaded documents.
 - Do not weaken Argon2 or authorization checks to improve benchmark numbers.
@@ -718,7 +747,7 @@ For failure scenarios and recovery sequencing, see [docs/operations/failure-reco
 ## Known limitations
 
 - The platform is under active development and has not been certified for production capacity or public multi-tenant operation.
-- Authentication primitives exist, but every administrative and AI workflow must be reviewed for role enforcement before public exposure.
+- Central RBAC protects the principal sensitive route groups, but tenant-scope enforcement, user/role administration and immutable audit logging are incomplete.
 - The browser-native PDF viewer does not yet provide application-level thumbnails, rotation, text highlighting, or full PDF.js search controls.
 - Chat responses do not yet stream tokens from the local provider.
 - Retrieval metadata does not yet expose a complete lexical/semantic/reranker timing and score breakdown.
@@ -726,7 +755,7 @@ For failure scenarios and recovery sequencing, see [docs/operations/failure-reco
 - Repository metadata quality and PDF availability vary by institution; ResearchHub cannot infer missing authors, years, DOI values, pages, or URLs safely.
 - AI-generated or extractive output is research assistance. Verify claims against the cited publication and original document.
 
-See [docs/advanced-ui-upgrade-plan.md](docs/advanced-ui-upgrade-plan.md) for staged implementation and [docs/advanced-ui-features.md](docs/advanced-ui-features.md) for the current advanced UI boundary.
+See the maintained [enterprise prototype known limitations](docs/enterprise-prototype-known-limitations.md) for the complete non-claim boundary.
 
 ## Documentation index
 
@@ -737,6 +766,9 @@ See [docs/advanced-ui-upgrade-plan.md](docs/advanced-ui-upgrade-plan.md) for sta
 - [Caching](docs/architecture/caching.md)
 - [Background workers](docs/architecture/background-workers.md)
 - [Authentication](docs/AUTHENTICATION.md)
+- [Enterprise prototype audit](docs/enterprise-prototype-audit.md)
+- [Database schema audit](docs/database-schema-audit.md)
+- [Authorization matrix](docs/authorization-matrix.md)
 - [Source management](docs/SOURCE_MANAGEMENT.md)
 - [Harvesting](docs/HARVESTING.md)
 - [Connectors](docs/CONNECTORS.md)
@@ -750,6 +782,12 @@ See [docs/advanced-ui-upgrade-plan.md](docs/advanced-ui-upgrade-plan.md) for sta
 - [Capacity planning](docs/operations/capacity-planning.md)
 - [Scaling operations](docs/operations/scaling.md)
 - [Failure recovery](docs/operations/failure-recovery.md)
+- [Backup and recovery](docs/BACKUP_AND_RECOVERY.md)
+- [Enterprise operations runbook](docs/operations/enterprise-prototype-runbook.md)
+- [Security review](docs/security/enterprise-prototype-security-review.md)
+- [Search evaluation](docs/search-evaluation.md)
+- [Showcase script](docs/showcase-script.md)
+- [Release checklist](docs/enterprise-prototype-release-checklist.md)
 
 ## Contributing
 

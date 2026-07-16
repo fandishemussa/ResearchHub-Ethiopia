@@ -5,7 +5,7 @@ from collections import defaultdict
 from collections.abc import Iterator
 from pathlib import PurePosixPath
 from typing import Any
-from urllib.parse import urlencode, urljoin, urlparse
+from urllib.parse import urljoin, urlparse
 
 from .http_client import ResilientHttpClient
 from .models import DocumentCandidate, Publication, SourceConfig
@@ -32,6 +32,21 @@ MIME_BY_EXTENSION = {
         "wordprocessingml.document"
     ),
 }
+
+
+def rewrite_bdu_url(source: SourceConfig, value: str) -> str:
+    """Rewrite a BDU handle resolver URL to the configured repository host.
+
+    Legacy metadata commonly stores ``hdl.handle.net`` links.  Keeping the
+    handle path while using the managed source host avoids an unnecessary
+    external redirect and makes the result deterministic in downloads and
+    tests. Non-handle URLs are returned unchanged.
+    """
+
+    handle = _handle_from_uri(value)
+    if handle is None:
+        return value
+    return f"{_base_url(source)}/handle/{handle}"
 
 
 def _base_url(source: SourceConfig) -> str:
@@ -279,10 +294,7 @@ def _is_supported_bitstream(
     if extension in SUPPORTED_EXTENSIONS:
         return True
 
-    if mime_type in SUPPORTED_MIME_TYPES:
-        return True
-
-    return False
+    return mime_type in SUPPORTED_MIME_TYPES
 
 
 def _bitstream_id(

@@ -12,7 +12,6 @@ from .models import DocumentCandidate, Publication, SourceConfig
 from .oai import iter_oai_publications
 from .utils import unique
 
-
 LOGGER = logging.getLogger(__name__)
 
 
@@ -382,14 +381,7 @@ def _publication_from_item(
             landing_url
         )
 
-    if handle:
-        external_id = (
-            f"wku:{handle}"
-        )
-    else:
-        external_id = (
-            f"wku:{uuid}"
-        )
+    external_id = f"wku:{handle}" if handle else f"wku:{uuid}"
 
     return Publication(
         source=source.key,

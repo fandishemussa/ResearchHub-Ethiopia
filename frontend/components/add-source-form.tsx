@@ -12,6 +12,7 @@ import { Card, Skeleton } from "@/components/ui";
 const types: Array<{ value: SourceType; label: string }> = [
   { value: "oai_pmh", label: "OAI-PMH Repository" },
   { value: "dspace_oai", label: "DSpace Repository" },
+  { value: "dspace_discovery", label: "DSpace REST Discovery API" },
   { value: "ojs_oai", label: "OJS Journal" },
   { value: "xml_import", label: "XML Import Source" },
   { value: "json_import", label: "JSON Import Source" },
@@ -36,15 +37,17 @@ export function AddSourceForm() {
   const requiresEndpoint = ["oai_pmh", "dspace_oai", "ojs_oai"].includes(
     form.source_type,
   );
+  const requiresDiscoveryApi = form.source_type === "dspace_discovery";
   const valid = useMemo(
     () =>
       Boolean(
         form.university_id &&
         form.name.trim().length >= 2 &&
         /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(form.slug) &&
-        (!requiresEndpoint || form.oai_endpoint),
+        (!requiresEndpoint || form.oai_endpoint) &&
+        (!requiresDiscoveryApi || form.api_url),
       ),
-    [form, requiresEndpoint],
+    [form, requiresDiscoveryApi, requiresEndpoint],
   );
   const test = useMutation({
     mutationFn: () => api.testSourceConfiguration(form),
@@ -172,6 +175,18 @@ export function AddSourceForm() {
                 </Field>
               </div>
             </>
+          )}
+          {requiresDiscoveryApi && (
+            <Field label="DSpace Discovery API endpoint">
+              <input
+                required
+                type="url"
+                value={form.api_url || ""}
+                onChange={(e) => setForm({ ...form, api_url: e.target.value })}
+                placeholder="https://repository.example.edu/server/api/discover/search/objects?query=%2A"
+                className="input"
+              />
+            </Field>
           )}
           <div className="flex flex-wrap gap-4">
             <label className="flex items-center gap-2 text-sm">

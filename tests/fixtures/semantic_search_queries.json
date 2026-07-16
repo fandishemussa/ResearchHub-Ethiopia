@@ -1,0 +1,10 @@
+[
+  {"query":"gender inequality and economic empowerment","expected_title_patterns":["gender inequality","economic empowerment"],"expected_publication_ids":[]},
+  {"query":"women's economic participation","expected_title_patterns":["women","economic"],"expected_publication_ids":[]},
+  {"query":"service quality in Ethiopian banks","expected_title_patterns":["service quality","bank"],"expected_publication_ids":[]},
+  {"query":"agricultural postharvest loss","expected_title_patterns":["postharvest","post-harvest"],"expected_publication_ids":[]},
+  {"query":"machine learning in Ethiopian universities","expected_title_patterns":["machine learning"],"expected_publication_ids":[]},
+  {"query":"climate-smart agriculture","expected_title_patterns":["climate","agriculture"],"expected_publication_ids":[]},
+  {"query":"maternal health","expected_title_patterns":["maternal health"],"expected_publication_ids":[]},
+  {"query":"soil fertility","expected_title_patterns":["soil fertility"],"expected_publication_ids":[]}
+]

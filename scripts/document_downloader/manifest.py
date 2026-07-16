@@ -3,14 +3,15 @@ from __future__ import annotations
 import json
 import os
 import threading
+from contextlib import suppress
 from copy import deepcopy
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
 
 def utc_now() -> str:
-    return datetime.now(timezone.utc).isoformat()
+    return datetime.now(UTC).isoformat()
 
 
 class ManifestManager:
@@ -96,12 +97,10 @@ class ManifestManager:
                     )
                 )
 
-                try:
+                with suppress(OSError):
                     self.manifest_path.replace(
                         backup_path
                     )
-                except OSError:
-                    pass
 
         now = utc_now()
 

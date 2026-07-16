@@ -3,11 +3,12 @@
 from fastapi import APIRouter
 
 from researchhub.api.v1 import (
+    routes_admin_ai,
     routes_ai,
     routes_auth,
     routes_authors,
-    routes_harvest,
     routes_documents,
+    routes_harvest,
     routes_imports,
     routes_publications,
     routes_quality,
@@ -19,6 +20,7 @@ from researchhub.api.v1.routes_dashboard import dashboard_router, statistics_rou
 
 api_router = APIRouter()
 api_router.include_router(routes_ai.router)
+api_router.include_router(routes_admin_ai.router)
 api_router.include_router(routes_auth.router)
 api_router.include_router(routes_universities.router)
 api_router.include_router(routes_publications.router)

@@ -250,6 +250,10 @@ class Publication(Base, TimestampMixin):
     embedding: Mapped[list[float] | None] = mapped_column(Vector(384))
     embedding_model: Mapped[str | None] = mapped_column(String(255))
     embedded_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    embedding_content_hash: Mapped[str | None] = mapped_column(String(64), index=True)
+    embedding_failure_code: Mapped[str | None] = mapped_column(String(80), index=True)
+    embedding_failure_message: Mapped[str | None] = mapped_column(Text)
+    embedding_retry_count: Mapped[int] = mapped_column(Integer, default=0)
 
     journal: Mapped[Journal | None] = relationship(back_populates="publications")
     publication_type: Mapped[PublicationType | None] = relationship(back_populates="publications")
@@ -679,6 +683,14 @@ class PublicationSummary(Base):
     verified_by: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
     verified_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     edited_text: Mapped[str | None] = mapped_column(Text)
+    research_document_id: Mapped[uuid.UUID | None] = mapped_column(
+        ForeignKey("research_documents.id", ondelete="SET NULL"), index=True
+    )
+    document_checksum: Mapped[str | None] = mapped_column(String(64), index=True)
+    pages_used: Mapped[list[int]] = mapped_column(JSONB, default=list)
+    chunk_count: Mapped[int] = mapped_column(Integer, default=0)
+    prompt_version: Mapped[str] = mapped_column(String(80), default="summary-v2")
+    is_stale: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
 
 
 class PublicationKeywordAI(Base):
@@ -932,7 +944,7 @@ class EmailVerificationToken(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
 
-class ResearchDocument(Base):
+class ResearchDocument(Base, TimestampMixin):
     __tablename__ = "research_documents"
 
     id: Mapped[uuid.UUID] = mapped_column(
@@ -951,6 +963,12 @@ class ResearchDocument(Base):
     source: Mapped[str] = mapped_column(
         String(50),
         nullable=False,
+        index=True,
+    )
+
+    external_id: Mapped[str | None] = mapped_column(
+        String(500),
+        nullable=True,
         index=True,
     )
 
@@ -975,8 +993,18 @@ class ResearchDocument(Base):
         nullable=True,
     )
 
+    filename: Mapped[str | None] = mapped_column(
+        String(1000),
+        nullable=True,
+    )
+
     mime_type: Mapped[str | None] = mapped_column(
         String(255),
+        nullable=True,
+    )
+
+    file_extension: Mapped[str | None] = mapped_column(
+        String(20),
         nullable=True,
     )
 
@@ -996,6 +1024,18 @@ class ResearchDocument(Base):
         nullable=True,
     )
 
+    character_count: Mapped[int] = mapped_column(
+        BigInteger,
+        nullable=False,
+        default=0,
+    )
+
+    chunk_count: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+        default=0,
+    )
+
     extraction_status: Mapped[str] = mapped_column(
         String(30),
         nullable=False,
@@ -1008,13 +1048,28 @@ class ResearchDocument(Base):
         nullable=True,
     )
 
+    processing_error_code: Mapped[str | None] = mapped_column(String(80), index=True)
+    technical_error: Mapped[str | None] = mapped_column(Text)
+    retry_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    last_attempted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
     metadata_json: Mapped[dict] = mapped_column(
         JSONB,
         nullable=False,
         default=dict,
     )
 
+    downloaded_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
+
     extracted_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
+
+    indexed_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True),
         nullable=True,
     )
@@ -1081,6 +1136,11 @@ class DocumentChunk(Base):
         nullable=False,
     )
 
+    token_count: Mapped[int | None] = mapped_column(
+        Integer,
+        nullable=True,
+    )
+
     embedding: Mapped[list[float] | None] = mapped_column(
         Vector(384),
         nullable=True,
@@ -1089,6 +1149,12 @@ class DocumentChunk(Base):
     embedding_model: Mapped[str | None] = mapped_column(
         String(255),
         nullable=True,
+    )
+
+    content_hash: Mapped[str | None] = mapped_column(
+        String(64),
+        nullable=True,
+        index=True,
     )
 
     embedded_at: Mapped[datetime | None] = mapped_column(
@@ -1100,6 +1166,12 @@ class DocumentChunk(Base):
         JSONB,
         nullable=False,
         default=dict,
+    )
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
     )
 
     document: Mapped[ResearchDocument] = relationship(

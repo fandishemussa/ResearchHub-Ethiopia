@@ -8,6 +8,7 @@ from researchhub.api.v1.dependencies import (
     get_harvest_operations_service,
     get_import_operations_service,
     get_source_management_service,
+    require_permission,
 )
 from researchhub.application.harvest_operations import HarvestOperationsService
 from researchhub.application.import_operations import ImportOperationsService
@@ -16,6 +17,7 @@ from researchhub.application.source_management import (
     test_source_configuration,
 )
 from researchhub.application.worker import run_source_harvest
+from researchhub.core.permissions import Permissions
 from researchhub.domain.schemas import (
     HarvestJobDetail,
     HarvestJobRead,
@@ -27,7 +29,11 @@ from researchhub.domain.schemas import (
     SourceUpdate,
 )
 
-router = APIRouter(prefix="/sources", tags=["source-management"])
+router = APIRouter(
+    prefix="/sources",
+    tags=["source-management"],
+    dependencies=[Depends(require_permission(Permissions.SOURCES_READ))],
+)
 
 
 @router.get("", response_model=list[SourceRead])
@@ -51,14 +57,18 @@ async def list_sources(
     ]
 
 
-@router.post("/test-configuration", response_model=SourceConnectionTestResult)
+@router.post(
+    "/test-configuration",
+    response_model=SourceConnectionTestResult,
+    dependencies=[Depends(require_permission(Permissions.SOURCES_MANAGE))],
+)
 async def test_unsaved_source(payload: SourceConnectionTestRequest) -> SourceConnectionTestResult:
     result = await test_source_configuration(
         payload.source_type,
         payload.slug,
         payload.name,
-        str(payload.oai_endpoint or payload.base_url)
-        if payload.oai_endpoint or payload.base_url
+        str(payload.oai_endpoint or payload.api_url or payload.base_url)
+        if payload.oai_endpoint or payload.api_url or payload.base_url
         else None,
         payload.metadata_prefix,
         payload.set_spec,
@@ -66,7 +76,12 @@ async def test_unsaved_source(payload: SourceConnectionTestRequest) -> SourceCon
     return SourceConnectionTestResult.model_validate(result)
 
 
-@router.post("", response_model=SourceRead, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "",
+    response_model=SourceRead,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(require_permission(Permissions.SOURCES_MANAGE))],
+)
 async def create_source(
     payload: SourceCreate, service: SourceManagementService = Depends(get_source_management_service)
 ) -> SourceRead:
@@ -88,8 +103,14 @@ async def get_source(
     return SourceRead.model_validate(item)
 
 
-@router.patch("/{source_id}", response_model=SourceRead)
-@router.put("/{source_id}", response_model=SourceRead)
+@router.patch(
+    "/{source_id}", response_model=SourceRead,
+    dependencies=[Depends(require_permission(Permissions.SOURCES_MANAGE))],
+)
+@router.put(
+    "/{source_id}", response_model=SourceRead,
+    dependencies=[Depends(require_permission(Permissions.SOURCES_MANAGE))],
+)
 async def update_source(
     source_id: UUID,
     payload: SourceUpdate,
@@ -106,7 +127,10 @@ async def update_source(
         ) from exc
 
 
-@router.delete("/{source_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete(
+    "/{source_id}", status_code=status.HTTP_204_NO_CONTENT,
+    dependencies=[Depends(require_permission(Permissions.SOURCES_MANAGE))],
+)
 async def delete_source(
     source_id: UUID, service: SourceManagementService = Depends(get_source_management_service)
 ) -> Response:
@@ -118,7 +142,10 @@ async def delete_source(
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
-@router.post("/{source_id}/enable", response_model=SourceRead)
+@router.post(
+    "/{source_id}/enable", response_model=SourceRead,
+    dependencies=[Depends(require_permission(Permissions.SOURCES_MANAGE))],
+)
 async def enable_source(
     source_id: UUID, service: SourceManagementService = Depends(get_source_management_service)
 ) -> SourceRead:
@@ -128,7 +155,10 @@ async def enable_source(
         raise HTTPException(status_code=404, detail=str(exc)) from exc
 
 
-@router.post("/{source_id}/disable", response_model=SourceRead)
+@router.post(
+    "/{source_id}/disable", response_model=SourceRead,
+    dependencies=[Depends(require_permission(Permissions.SOURCES_MANAGE))],
+)
 async def disable_source(
     source_id: UUID, service: SourceManagementService = Depends(get_source_management_service)
 ) -> SourceRead:
@@ -138,7 +168,10 @@ async def disable_source(
         raise HTTPException(status_code=404, detail=str(exc)) from exc
 
 
-@router.post("/{source_id}/test", response_model=SourceConnectionTestResult)
+@router.post(
+    "/{source_id}/test", response_model=SourceConnectionTestResult,
+    dependencies=[Depends(require_permission(Permissions.SOURCES_MANAGE))],
+)
 async def test_source(
     source_id: UUID, service: SourceManagementService = Depends(get_source_management_service)
 ) -> SourceConnectionTestResult:
@@ -195,7 +228,9 @@ async def _queue_harvest(
 
 
 @router.post(
-    "/{source_id}/harvest", response_model=HarvestJobDetail, status_code=status.HTTP_202_ACCEPTED
+    "/{source_id}/harvest", response_model=HarvestJobDetail,
+    status_code=status.HTTP_202_ACCEPTED,
+    dependencies=[Depends(require_permission(Permissions.HARVEST_START))],
 )
 async def run_source(
     source_id: UUID,
@@ -209,6 +244,7 @@ async def run_source(
     "/{source_id}/harvest/full",
     response_model=HarvestJobDetail,
     status_code=status.HTTP_202_ACCEPTED,
+    dependencies=[Depends(require_permission(Permissions.HARVEST_START))],
 )
 async def run_full_source(
     source_id: UUID, service: HarvestOperationsService = Depends(get_harvest_operations_service)
@@ -220,6 +256,7 @@ async def run_full_source(
     "/{source_id}/harvest/incremental",
     response_model=HarvestJobDetail,
     status_code=status.HTTP_202_ACCEPTED,
+    dependencies=[Depends(require_permission(Permissions.HARVEST_START))],
 )
 async def run_incremental_source(
     source_id: UUID, service: HarvestOperationsService = Depends(get_harvest_operations_service)
@@ -231,6 +268,7 @@ async def run_incremental_source(
     "/{source_id}/harvest/dry-run",
     response_model=HarvestJobDetail,
     status_code=status.HTTP_202_ACCEPTED,
+    dependencies=[Depends(require_permission(Permissions.HARVEST_START))],
 )
 async def run_dry_source(
     source_id: UUID, service: HarvestOperationsService = Depends(get_harvest_operations_service)
@@ -261,7 +299,9 @@ async def _source_upload(
 
 
 @router.post(
-    "/{source_id}/import/xml", response_model=HarvestJobDetail, status_code=status.HTTP_201_CREATED
+    "/{source_id}/import/xml", response_model=HarvestJobDetail,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(require_permission(Permissions.IMPORTS_CREATE))],
 )
 async def source_import_xml(
     source_id: UUID,
@@ -272,7 +312,9 @@ async def source_import_xml(
 
 
 @router.post(
-    "/{source_id}/import/json", response_model=HarvestJobDetail, status_code=status.HTTP_201_CREATED
+    "/{source_id}/import/json", response_model=HarvestJobDetail,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(require_permission(Permissions.IMPORTS_CREATE))],
 )
 async def source_import_json(
     source_id: UUID,
@@ -283,7 +325,9 @@ async def source_import_json(
 
 
 @router.post(
-    "/{source_id}/import/csv", response_model=HarvestJobDetail, status_code=status.HTTP_201_CREATED
+    "/{source_id}/import/csv", response_model=HarvestJobDetail,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(require_permission(Permissions.IMPORTS_CREATE))],
 )
 async def source_import_csv(
     source_id: UUID,

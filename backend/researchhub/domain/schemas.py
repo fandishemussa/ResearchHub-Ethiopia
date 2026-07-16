@@ -139,6 +139,10 @@ class SemanticSearchResult(APIModel):
     source: str
     article_url: str | None = None
     similarity: float
+    semantic_score: float | None = None
+    lexical_score: float | None = None
+    keyword_score: float | None = None
+    combined_score: float | None = None
 
 
 class SemanticSearchResponse(APIModel):
@@ -148,6 +152,8 @@ class SemanticSearchResponse(APIModel):
     model: str
     count: int
     results: list[SemanticSearchResult]
+    ranking_strategy: str = "hybrid"
+    warnings: list[str] = Field(default_factory=list)
 
 
 class SimilarPublicationResult(APIModel):
@@ -172,6 +178,9 @@ class PublicationSimilarityResponse(APIModel):
     model: str
     count: int
     results: list[SimilarPublicationResult]
+    status: Literal["ready", "embedding_required"] = "ready"
+    message: str | None = None
+    minimum_similarity: float | None = None
 
 
 class ChatSessionCreate(APIModel):
@@ -294,6 +303,8 @@ class ChatResponse(APIModel):
     grounding_status: Literal["strong", "partial", "insufficient"] = "insufficient"
     model_name: str
     follow_up_questions: list[str] = Field(default_factory=list)
+    resource_mode: Literal["NORMAL", "LOW_MEMORY", "CRITICAL"] | None = None
+    context: dict[str, int | bool] | None = None
 
 
 class ChatFeedbackCreate(APIModel):
@@ -365,19 +376,43 @@ class SummaryRequest(APIModel):
     max_length: int = Field(default=900, ge=100, le=5000)
     language: str = Field(default="en", max_length=20)
     force_regenerate: bool = False
+    summary_scope: Literal["auto", "full_text", "abstract", "metadata"] = "auto"
+    summary_style: str | None = None
+    force_reprocess: bool = False
+    wait_for_indexing: bool = False
 
 
 class SummaryRead(APIModel):
-    id: UUID
+    id: UUID | None = None
     publication_id: UUID
     summary_type: str
-    summary_text: str
-    model_name: str
+    summary_text: str | None = None
+    summary: str | None = None
+    model_name: str | None = None
     model_version: str | None = None
-    source_fields: list[str]
+    source_fields: list[str] = Field(default_factory=list)
     confidence_score: Decimal | None = None
-    is_verified: bool
-    generated_at: datetime
+    is_verified: bool = False
+    generated_at: datetime | None = None
+    status: Literal["ready", "processing", "unavailable"] = "ready"
+    summary_source: Literal[
+        "full_text",
+        "downloaded_document",
+        "newly_downloaded_document",
+        "abstract",
+        "metadata",
+        "unavailable",
+    ] = "metadata"
+    summary_style: str = "short"
+    research_document_id: UUID | None = None
+    document_status: str | None = None
+    pages_used: list[int] = Field(default_factory=list)
+    chunk_count: int = 0
+    provider: str | None = None
+    cached: bool = False
+    warnings: list[str] = Field(default_factory=list)
+    processing_job_id: str | None = None
+    message: str | None = None
 
 
 class AIKeywordRead(APIModel):
@@ -666,6 +701,13 @@ class UserRead(APIModel):
     department_id: UUID | None
     last_login_at: datetime | None
     created_at: datetime
+    roles: list[str] = Field(default_factory=list)
+    permissions: list[str] = Field(default_factory=list)
+
+
+class AuthorizationMatrixRead(APIModel):
+    roles: dict[str, list[str]]
+    permissions: list[str]
 
 
 class RefreshSessionRead(APIModel):

@@ -36,8 +36,15 @@ class HarvestOperationsService:
         if not source.enabled:
             raise ValueError("Disabled sources cannot be harvested")
         connector_type = source.connector_type.replace("-", "_")
-        if connector_type not in {"oai_pmh", "dspace_oai", "ojs_oai"}:
-            raise ValueError("Online harvesting is only available for OAI-PMH sources")
+        if connector_type not in {
+            "oai_pmh",
+            "dspace_oai",
+            "ojs_oai",
+            "dspace_discovery",
+        }:
+            raise ValueError(
+                "Online harvesting is only available for OAI-PMH and DSpace Discovery sources"
+            )
         # Normalize legacy/imported values such as ``oai-pmh`` so subsequent
         # harvests and API responses use the canonical SourceType spelling.
         if source.connector_type != connector_type:

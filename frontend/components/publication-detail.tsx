@@ -139,8 +139,13 @@ export function PublicationDetail({ id }: { id: string }) {
 }
 
 function PublicationIntelligence({ publicationId }: { publicationId: string }) {
-  const summary = useMutation({
-    mutationFn: () => api.summarizePublication(publicationId),
+  const summary = useQuery({
+    queryKey: ["publication-summary", publicationId],
+    queryFn: ({ signal }) =>
+      api.summarizePublication(publicationId, "structured", signal),
+    enabled: false,
+    refetchInterval: (query) =>
+      query.state.data?.status === "processing" ? 2500 : false,
   });
   const keywords = useMutation({
     mutationFn: () => api.extractPublicationKeywords(publicationId),
@@ -148,7 +153,7 @@ function PublicationIntelligence({ publicationId }: { publicationId: string }) {
   const citation = useMutation({
     mutationFn: () => api.publicationCitation(publicationId, "apa7"),
   });
-  const busy = summary.isPending || keywords.isPending || citation.isPending;
+  const busy = summary.isFetching || keywords.isPending || citation.isPending;
   return (
     <Card className="p-5 sm:p-8">
       <div className="flex items-center gap-2">
@@ -156,13 +161,13 @@ function PublicationIntelligence({ publicationId }: { publicationId: string }) {
         <h2 className="font-serif text-xl font-bold">Research intelligence</h2>
       </div>
       <p className="mt-2 text-sm text-stone-500">
-        Generate grounded assistance from this publication&apos;s metadata and
-        abstract.
+        Generate grounded assistance from indexed full text when available, with
+        explicit abstract or metadata fallbacks.
       </p>
       <div className="mt-4 flex flex-wrap gap-2">
         <button
           disabled={busy}
-          onClick={() => summary.mutate()}
+          onClick={() => void summary.refetch()}
           className="rounded-lg bg-emerald-800 px-3 py-2 text-sm font-semibold text-white disabled:opacity-50"
         >
           Generate summary
@@ -190,10 +195,44 @@ function PublicationIntelligence({ publicationId }: { publicationId: string }) {
       </div>
       {summary.data && (
         <div className="mt-5 rounded-xl bg-stone-100 p-4 dark:bg-stone-800">
-          <strong className="text-sm">Abstract-based summary</strong>
-          <p className="mt-2 whitespace-pre-line text-sm leading-6">
-            {summary.data.summary_text}
-          </p>
+          <strong className="inline-flex rounded-full bg-white px-2.5 py-1 text-sm dark:bg-stone-900">
+            {summary.data.status === "processing"
+              ? "Document processing required"
+              : summary.data.summary_source === "full_text"
+                ? "Full-text summary"
+                : summary.data.summary_source === "abstract"
+                  ? "Abstract-based summary"
+                  : summary.data.summary_source === "metadata"
+                    ? "Metadata-based summary"
+                    : "Full text unavailable"}
+          </strong>
+          {summary.data.status === "processing" ? (
+            <p
+              role="status"
+              className="mt-3 text-sm text-stone-600 dark:text-stone-300"
+            >
+              {summary.data.message || "The document is being indexed."}
+            </p>
+          ) : (
+            <p className="mt-3 whitespace-pre-line text-sm leading-6">
+              {summary.data.summary_text}
+            </p>
+          )}
+          {summary.data.pages_used.length > 0 && (
+            <p className="mt-3 text-xs text-stone-500">
+              Evidence pages: {summary.data.pages_used.join(", ")} ·{" "}
+              {summary.data.chunk_count} indexed chunks
+            </p>
+          )}
+          {summary.data.warnings.map((warning) => (
+            <p
+              key={warning}
+              role="note"
+              className="mt-3 text-sm text-amber-800 dark:text-amber-300"
+            >
+              {warning}
+            </p>
+          ))}
         </div>
       )}
       {keywords.data && (
@@ -256,6 +295,8 @@ function SimilarResearch({ publicationId }: { publicationId: string }) {
         signal,
       ),
     retry: false,
+    refetchInterval: (query) =>
+      query.state.data?.status === "embedding_required" ? 3000 : false,
   });
 
   if (similar.isPending) {
@@ -270,21 +311,35 @@ function SimilarResearch({ publicationId }: { publicationId: string }) {
       </Card>
     );
   }
+
   if (similar.isError) {
-    const unavailable =
-      similar.error instanceof ApiError && similar.error.status === 409;
     return (
       <Card className="p-5 sm:p-8">
         <h2 className="font-serif text-xl font-bold">Similar research</h2>
         <p className="mt-3 text-sm text-stone-500">
-          {unavailable
-            ? "Similarity results will appear after this publication has an embedding."
-            : "Similar publications could not be loaded."}
+          Similar publications could not be loaded.
         </p>
       </Card>
     );
   }
 
+  if (similar.data.status === "embedding_required") {
+    return (
+      <Card className="p-5 sm:p-8">
+        <h2 className="font-serif text-xl font-bold">Similar research</h2>
+        <p role="status" className="mt-3 text-sm text-stone-500">
+          {similar.data.message ||
+            "A semantic representation is being generated for this publication."}
+        </p>
+        <button
+          onClick={() => void similar.refetch()}
+          className="mt-4 rounded-lg border border-stone-300 px-3 py-2 text-sm font-semibold dark:border-stone-700"
+        >
+          Check again
+        </button>
+      </Card>
+    );
+  }
   return (
     <Card className="p-5 sm:p-8">
       <div className="flex flex-wrap items-end justify-between gap-2">

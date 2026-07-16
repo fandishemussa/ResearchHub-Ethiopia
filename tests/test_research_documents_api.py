@@ -6,10 +6,9 @@ from typing import cast
 from uuid import uuid4
 
 import pytest
-from sqlalchemy.ext.asyncio import AsyncSession
-
 from researchhub.application.documents import ResearchDocumentService, _public_url
 from researchhub.domain.schemas import ResearchDocumentRead
+from sqlalchemy.ext.asyncio import AsyncSession
 
 
 class FakeSession:

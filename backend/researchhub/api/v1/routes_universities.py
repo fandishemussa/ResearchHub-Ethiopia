@@ -2,11 +2,16 @@
 
 from fastapi import APIRouter, Depends, Query
 
-from researchhub.api.v1.dependencies import get_catalog_service
+from researchhub.api.v1.dependencies import get_catalog_service, require_permission
 from researchhub.application.services import CatalogService
+from researchhub.core.permissions import Permissions
 from researchhub.domain.schemas import UniversityCreate, UniversityRead
 
-router = APIRouter(prefix="/universities", tags=["universities"])
+router = APIRouter(
+    prefix="/universities",
+    tags=["universities"],
+    dependencies=[Depends(require_permission(Permissions.PUBLICATIONS_READ))],
+)
 
 
 @router.get("", response_model=list[UniversityRead])
@@ -21,7 +26,12 @@ async def list_universities(
     return [UniversityRead.model_validate(item) for item in universities]
 
 
-@router.post("", response_model=UniversityRead, status_code=201)
+@router.post(
+    "",
+    response_model=UniversityRead,
+    status_code=201,
+    dependencies=[Depends(require_permission(Permissions.SETTINGS_MANAGE))],
+)
 async def create_university(
     payload: UniversityCreate,
     service: CatalogService = Depends(get_catalog_service),
@@ -30,4 +40,3 @@ async def create_university(
 
     university = await service.create_university(payload)
     return UniversityRead.model_validate(university)
-

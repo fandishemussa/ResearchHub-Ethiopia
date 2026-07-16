@@ -4,8 +4,9 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 
-from researchhub.api.v1.dependencies import get_quality_service
+from researchhub.api.v1.dependencies import get_quality_service, require_permission
 from researchhub.application.metadata_quality import MetadataQualityService
+from researchhub.core.permissions import Permissions
 from researchhub.domain.schemas import (
     QualityIssuePage,
     QualityIssueRead,
@@ -16,7 +17,11 @@ from researchhub.domain.schemas import (
 )
 from researchhub.infrastructure.persistence.repositories import QualityReportFilters
 
-router = APIRouter(prefix="/quality", tags=["quality"])
+router = APIRouter(
+    prefix="/quality",
+    tags=["quality"],
+    dependencies=[Depends(require_permission(Permissions.PUBLICATIONS_READ))],
+)
 
 
 def _quality_filters(
@@ -142,7 +147,11 @@ async def low_quality_publications(
     return _report_page_response(page)
 
 
-@router.post("/publications/{publication_id}/recalculate", response_model=QualityReportRead)
+@router.post(
+    "/publications/{publication_id}/recalculate",
+    response_model=QualityReportRead,
+    dependencies=[Depends(require_permission(Permissions.METADATA_CORRECT))],
+)
 async def recalculate_publication_quality(
     publication_id: UUID,
     service: MetadataQualityService = Depends(get_quality_service),
@@ -158,7 +167,11 @@ async def recalculate_publication_quality(
     return QualityReportRead.model_validate(report)
 
 
-@router.post("/recalculate-all", response_model=QualityRecalculateAllRead)
+@router.post(
+    "/recalculate-all",
+    response_model=QualityRecalculateAllRead,
+    dependencies=[Depends(require_permission(Permissions.METADATA_APPROVE))],
+)
 async def recalculate_all_quality(
     include_deleted: bool = Query(default=False),
     limit: int = Query(default=500, ge=1, le=500),

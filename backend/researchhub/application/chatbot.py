@@ -17,19 +17,23 @@ metadata when useful.
 from __future__ import annotations
 
 import asyncio
+import logging
 from collections import defaultdict
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import UTC, datetime
 from pathlib import Path
 from time import perf_counter
+from typing import cast
 from urllib.parse import urlparse
 from uuid import UUID
 
-from researchhub_ai.chat import ChatProvider, ChatSource
+from researchhub_ai.chat import SYSTEM_PROMPT, ChatProvider, ChatSource
+from researchhub_ai.context import ContextManager, ContextPolicy, ContextSource
 from researchhub_ai.embeddings import get_embedding_service
 from sqlalchemy import Select, exists, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
+from sqlalchemy.sql.elements import ColumnElement
 
 from researchhub.core.config import get_settings
 from researchhub.infrastructure.persistence.models import (
@@ -51,6 +55,8 @@ INJECTION_MARKERS = (
     "database password",
     "run a shell command",
 )
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(slots=True)
@@ -80,6 +86,7 @@ class RetrievedSource:
     page_end: int | None = None
     chunk_index: int | None = None
     chunk_id: UUID | None = None
+    section: str | None = None
 
     similarity_score: float | None = None
 
@@ -108,7 +115,7 @@ def research_retrieval_statement(
     )
 
     if tokens:
-        clauses = []
+        clauses: list[ColumnElement[bool]] = []
 
         for token in tokens:
             pattern = f"%{token}%"
@@ -168,11 +175,15 @@ class ResearchChatService:
         provider: ChatProvider,
         *,
         max_sources: int = 8,
+        context_manager: ContextManager | None = None,
+        expose_context_diagnostics: bool = True,
     ) -> None:
         self.session = session
         self.provider = provider
         self.max_sources = max_sources
         self.settings = get_settings()
+        self.context_manager = context_manager or ContextManager(ContextPolicy(memory_guard=False))
+        self.expose_context_diagnostics = expose_context_diagnostics
 
     async def create_session(
         self,
@@ -221,7 +232,7 @@ class ResearchChatService:
         if with_messages:
             statement = statement.options(selectinload(ChatSession.messages))
 
-        return await self.session.scalar(statement)
+        return cast(ChatSession | None, await self.session.scalar(statement))
 
     async def delete_session(
         self,
@@ -247,8 +258,6 @@ class ResearchChatService:
         title: str | None = None,
         is_pinned: bool | None = None,
     ) -> ChatSession:
-        """Rename or pin a saved research conversation."""
-
         item = await self.get_session(session_id)
         if item is None:
             raise LookupError("Chat session not found")
@@ -347,11 +356,50 @@ class ResearchChatService:
             include_metadata=include_metadata,
         )
 
-        provider_sources = [_to_chat_source(item) for item in retrieved_sources]
+        candidate_provider_sources = [_to_chat_source(item) for item in retrieved_sources]
+
+        provider_question = _mode_question(cleaned, mode, answer_length, response_language)
+        prepared = self.context_manager.prepare(
+            provider_question,
+            cast(list[ContextSource], candidate_provider_sources),
+            system_prompt=SYSTEM_PROMPT,
+        )
+        source_map = {
+            id(provider_source): retrieved_source
+            for provider_source, retrieved_source in zip(
+                candidate_provider_sources, retrieved_sources, strict=True
+            )
+        }
+        provider_source_map = {
+            id(provider_source): provider_source for provider_source in candidate_provider_sources
+        }
+        provider_sources = [
+            replace(provider_source_map[id(evidence.source)], text=evidence.text)
+            for evidence in prepared.evidence
+        ]
+        selected_retrieved_sources = [
+            source_map[id(evidence.source)] for evidence in prepared.evidence
+        ]
+
+        logger.info(
+            "chat_context mode=%s num_ctx=%d num_predict=%d candidates=%d selected=%d "
+            "evidence_budget=%d evidence_tokens=%d duplicates=%d overlaps=%d compressed=%d",
+            prepared.profile.mode.value,
+            prepared.profile.num_ctx,
+            prepared.profile.num_predict,
+            prepared.candidate_count,
+            len(prepared.evidence),
+            prepared.budget.available_evidence_tokens,
+            prepared.budget.selected_evidence_tokens,
+            prepared.duplicate_count,
+            prepared.overlap_count,
+            prepared.compression_count,
+        )
 
         completion = await self.provider.complete(
-            _mode_question(cleaned, mode, answer_length, response_language),
+            provider_question,
             provider_sources,
+            prepared=prepared,
         )
 
         latency_ms = max(
@@ -362,23 +410,29 @@ class ResearchChatService:
         citations = [
             _retrieved_citation(item, index)
             for index, item in enumerate(
-                retrieved_sources,
+                selected_retrieved_sources,
                 start=1,
             )
         ]
 
         warnings: list[str] = []
 
-        if not retrieved_sources:
+        if not selected_retrieved_sources:
             warnings.append("No supporting publications or indexed PDF chunks were retrieved.")
 
-        elif not any(item.source_type == "document_chunk" for item in retrieved_sources):
+        elif not any(item.source_type == "document_chunk" for item in selected_retrieved_sources):
             warnings.append(
                 "The response used publication metadata because no "
                 "matching indexed PDF chunks were found."
             )
 
-        retrieved_ids = [str(item.source_id) for item in retrieved_sources]
+        retrieved_ids = [str(item.source_id) for item in selected_retrieved_sources]
+        context_diagnostics = (
+            completion.diagnostics or {} if self.expose_context_diagnostics else {}
+        )
+        resource_mode_code = {"NORMAL": 0, "LOW_MEMORY": 1, "CRITICAL": 2}.get(
+            str(context_diagnostics.get("resource_mode")), 0
+        )
 
         assistant = ChatMessage(
             session_id=chat.id,
@@ -392,13 +446,22 @@ class ResearchChatService:
                 "prompt_tokens": completion.prompt_tokens,
                 "completion_tokens": completion.completion_tokens,
                 "total_tokens": (completion.prompt_tokens + completion.completion_tokens),
-                "retrieved_sources": len(retrieved_sources),
+                "retrieved_sources": len(selected_retrieved_sources),
                 "retrieved_pdf_chunks": sum(
-                    item.source_type == "document_chunk" for item in retrieved_sources
+                    item.source_type == "document_chunk" for item in selected_retrieved_sources
                 ),
                 "retrieved_publications": sum(
-                    item.source_type == "publication" for item in retrieved_sources
+                    item.source_type == "publication" for item in selected_retrieved_sources
                 ),
+                "resource_mode_code": resource_mode_code,
+                "configured_num_ctx": int(context_diagnostics.get("configured_num_ctx", 0)),
+                "estimated_prompt_tokens": int(
+                    context_diagnostics.get("estimated_prompt_tokens", 0)
+                ),
+                "reserved_output_tokens": int(context_diagnostics.get("reserved_output_tokens", 0)),
+                "selected_context_chunks": int(context_diagnostics.get("selected_chunks", 0)),
+                "dropped_context_chunks": int(context_diagnostics.get("dropped_chunks", 0)),
+                "context_truncated": int(bool(context_diagnostics.get("context_truncated", False))),
             },
             warnings=warnings,
         )
@@ -458,11 +521,14 @@ class ResearchChatService:
 
         # When the question clearly targets one named document, do not dilute
         # the context with unrelated metadata-only publications.
+        source_limit = min(
+            self.max_sources,
+            max(top_chunks, self.settings.rag_retrieval_candidates),
+        )
         if document_sources and _is_specific_document_query(query, document_sources[0].title):
-            return document_sources[:top_chunks]
+            return document_sources[:source_limit]
 
         results: list[RetrievedSource] = list(document_sources)
-        source_limit = max(self.max_sources, top_chunks)
         remaining = source_limit - len(results)
 
         if remaining > 0 and include_metadata:
@@ -481,7 +547,7 @@ class ResearchChatService:
             existing_titles = {item.title.casefold() for item in results}
 
             for item in publication_sources:
-                if len(results) >= self.max_sources:
+                if len(results) >= source_limit:
                     break
                 if item.publication_id in linked_publication_ids:
                     continue
@@ -624,7 +690,7 @@ class ResearchChatService:
                 )
             )
 
-        candidate_limit = max(top_chunks * 10, 60)
+        candidate_limit = max(self.settings.rag_retrieval_candidates, top_chunks * 10, 60)
         rows = (
             await self.session.execute(statement.order_by(distance.asc()).limit(candidate_limit))
         ).all()
@@ -641,14 +707,18 @@ class ResearchChatService:
         results: list[RetrievedSource] = []
         chunks_per_document: defaultdict[UUID, int] = defaultdict(int)
         selected_documents: set[UUID] = set()
+        selection_limit = min(
+            self.max_sources,
+            max(top_chunks, self.settings.rag_retrieval_candidates),
+        )
 
         # Detailed questions about a named paper need several sections from the
         # same document. Broad questions still favor document diversity.
-        primary_chunk_limit = min(top_chunks, 12) if document_specific else 3
+        primary_chunk_limit = min(selection_limit, 12) if document_specific else 3
         secondary_chunk_limit = 1 if document_specific else 2
 
         for chunk, document, raw_distance in rows:
-            if len(results) >= top_chunks:
+            if len(results) >= selection_limit:
                 break
 
             title = document.title or _title_from_path(document.local_path)
@@ -772,8 +842,6 @@ class ResearchChatService:
         return feedback
 
     async def document_preview_path(self, document_id: UUID) -> Path:
-        """Resolve an indexed PDF by ID without returning its stored path."""
-
         document = await self.session.get(ResearchDocument, document_id)
         if document is None:
             raise LookupError("Research document not found")
@@ -879,7 +947,7 @@ def _publication_to_retrieved_source(
         source_type="publication",
         authors=authors,
         publication_year=(publication.publication_year),
-        url=publication.article_url,
+        url=_safe_public_url(publication.article_url),
         source_code=publication.source,
         repository=publication.source.upper(),
         document_type=publication.source_type,
@@ -919,6 +987,13 @@ def _to_chat_source(
         text=prefix + item.text,
         authors=item.authors,
         year=item.publication_year,
+        document_id=str(item.document_id) if item.document_id else None,
+        chunk_id=str(item.chunk_id) if item.chunk_id else None,
+        page_start=item.page_start,
+        page_end=item.page_end,
+        section=item.section,
+        chunk_index=item.chunk_index,
+        similarity=item.similarity_score,
     )
 
 
@@ -930,6 +1005,8 @@ def _retrieved_citation(
 
     return {
         "index": index,
+        # Kept for compatibility with the existing frontend.
+        # For standalone indexed PDFs this contains the document UUID.
         "publication_id": str(item.publication_id) if item.publication_id else None,
         "document_id": (str(item.document_id) if item.document_id else None),
         "chunk_id": str(item.chunk_id) if item.chunk_id else None,
@@ -955,15 +1032,20 @@ def _retrieved_citation(
     }
 
 
-def grounding_status(citations: list[dict[str, object]]) -> str:
-    """Classify response grounding from retrieved evidence metadata."""
+def _safe_public_url(value: str | None) -> str | None:
+    if not value:
+        return None
+    parsed = urlparse(value)
+    return value if parsed.scheme in {"http", "https"} and parsed.netloc else None
 
+
+def grounding_status(citations: list[dict[str, object]]) -> str:
     chunks = [item for item in citations if item.get("source_type") == "document_chunk"]
-    similarities = [
-        float(item["similarity_score"])
-        for item in chunks
-        if isinstance(item.get("similarity_score"), int | float)
-    ]
+    similarities: list[float] = []
+    for item in chunks:
+        score = item.get("similarity_score")
+        if isinstance(score, int | float):
+            similarities.append(float(score))
     if len(chunks) >= 3 and similarities and max(similarities) >= 0.65:
         return "strong"
     if citations:
@@ -972,8 +1054,6 @@ def grounding_status(citations: list[dict[str, object]]) -> str:
 
 
 def follow_up_questions(mode: str, grounding: str) -> list[str]:
-    """Return concise, mode-aware prompts without another model call."""
-
     if grounding == "insufficient":
         return [
             "Broaden the search to all repositories.",
@@ -1006,13 +1086,18 @@ def follow_up_questions(mode: str, grounding: str) -> list[str]:
     )
 
 
+def _metadata_text(metadata: dict[object, object] | None, key: str) -> str | None:
+    value = (metadata or {}).get(key)
+    return str(value).strip() if isinstance(value, str) and value.strip() else None
+
+
 def _mode_question(message: str, mode: str, answer_length: str, language: str) -> str:
     instructions = {
         "summarize": "Summarize the retrieved research with findings, methods, and limitations.",
-        "compare": "Compare 2-5 studies in a Markdown table with study, year, objective, methodology, sample, findings, limitations, and citation.",
+        "compare": "Compare the studies by objective, methodology, sample, findings, and limitations.",
         "methodology": "Extract the design, sample, instruments, analysis, and methodological limitations.",
-        "evidence": "Prioritize page-level quotations and evidence supporting each conclusion.",
-        "literature_review": "Write sections for topic overview, themes, agreement, contradictions, methods, gaps, future research, and references.",
+        "evidence": "Prioritize page-level evidence supporting each conclusion.",
+        "literature_review": "Synthesize themes, agreement, contradictions, methods, gaps, and future research.",
         "citation": "Generate a complete citation from only the available metadata.",
         "explain": "Explain the findings clearly in plain language while preserving citations.",
         "ask": "Answer the research question directly.",
@@ -1021,20 +1106,6 @@ def _mode_question(message: str, mode: str, answer_length: str, language: str) -
         f"{message}\n\nTask: {instructions.get(mode, instructions['ask'])} "
         f"Use a {answer_length} response in {language}."
     )
-
-
-def _safe_public_url(value: str | None) -> str | None:
-    if not value:
-        return None
-    parsed = urlparse(value)
-    if parsed.scheme in {"http", "https"} and parsed.netloc:
-        return value
-    return None
-
-
-def _metadata_text(metadata: dict | None, key: str) -> str | None:
-    value = (metadata or {}).get(key)
-    return str(value).strip() if isinstance(value, str) and value.strip() else None
 
 
 def _title_from_path(

@@ -5,19 +5,28 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from fastapi.responses import FileResponse
+from researchhub_ai.chat import ChatResourceUnavailable
+from researchhub_ai.providers import OllamaQueueTimeout, OllamaResourceError
 
 from researchhub.api.v1.dependencies import (
     get_publication_similarity_service,
     get_research_chat_service,
     get_research_intelligence_service,
+    require_permission,
 )
 from researchhub.application.chatbot import (
     ResearchChatService,
     follow_up_questions,
     grounding_status,
 )
-from researchhub.application.research_intelligence import ResearchIntelligenceService
+from researchhub.application.research_intelligence import (
+    ResearchIntelligenceService,
+    SummaryOutcome,
+)
 from researchhub.application.services import PublicationSimilarityService
+from researchhub.application.worker import celery_app
+from researchhub.core.config import get_settings
+from researchhub.core.permissions import Permissions
 from researchhub.domain.schemas import (
     AIKeywordRead,
     ChatFeedbackCreate,
@@ -36,7 +45,11 @@ from researchhub.domain.schemas import (
     TrendOverviewPoint,
 )
 
-router = APIRouter(prefix="/ai", tags=["ai-research-intelligence"])
+router = APIRouter(
+    prefix="/ai",
+    tags=["ai-research-intelligence"],
+    dependencies=[Depends(require_permission(Permissions.AI_USE))],
+)
 
 
 @router.get(
@@ -67,16 +80,35 @@ async def similar_publications(
         )
     except LookupError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
-    except RuntimeError as exc:
-        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    except RuntimeError:
+        celery_app.send_task(
+            "researchhub.embeddings.generate_publication",
+            args=[str(publication_id)],
+            task_id=f"publication-embedding-{publication_id}",
+        )
+        return PublicationSimilarityResponse(
+            publication_id=publication_id,
+            model=get_settings().embedding_model,
+            count=0,
+            results=[],
+            status="embedding_required",
+            message="A semantic representation is being generated for this publication.",
+            minimum_similarity=minimum_score,
+        )
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
+    except OllamaQueueTimeout as exc:
+        raise HTTPException(status_code=429, detail=str(exc)) from exc
+    except (ChatResourceUnavailable, OllamaResourceError) as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
 
     return PublicationSimilarityResponse(
         publication_id=target.id,
         model=target.embedding_model or "unknown",
         count=len(results),
         results=[SimilarPublicationResult.model_validate(item) for item in results],
+        status="ready",
+        minimum_similarity=minimum_score,
     )
 
 
@@ -213,10 +245,31 @@ async def ask_research_chatbot(
         grounding_status=grounding,
         model_name=message.model_name or "unknown",
         follow_up_questions=follow_up_questions(payload.mode, grounding),
+        resource_mode=(
+            {0: "NORMAL", 1: "LOW_MEMORY", 2: "CRITICAL"}.get(
+                message.usage.get("resource_mode_code", 0), "NORMAL"
+            )
+            if message.usage.get("configured_num_ctx", 0)
+            else None
+        ),
+        context={
+            "configured_num_ctx": message.usage.get("configured_num_ctx", 0),
+            "estimated_prompt_tokens": message.usage.get("estimated_prompt_tokens", 0),
+            "reserved_output_tokens": message.usage.get("reserved_output_tokens", 0),
+            "selected_chunks": message.usage.get("selected_context_chunks", 0),
+            "dropped_chunks": message.usage.get("dropped_context_chunks", 0),
+            "context_truncated": bool(message.usage.get("context_truncated", 0)),
+        }
+        if message.usage.get("configured_num_ctx", 0)
+        else None,
     )
 
 
-@router.get("/documents/{document_id}/view", response_class=FileResponse)
+@router.get(
+    "/documents/{document_id}/view",
+    response_class=FileResponse,
+    dependencies=[Depends(require_permission(Permissions.DOCUMENTS_DOWNLOAD))],
+)
 async def view_research_document(
     document_id: UUID,
     page: int | None = Query(default=None, ge=1, le=100_000),
@@ -249,6 +302,35 @@ async def submit_chat_feedback(
     return {"id": str(feedback.id), "status": "recorded"}
 
 
+def _summary_response(result: SummaryOutcome) -> SummaryRead:
+    return SummaryRead(
+        id=result.id,
+        publication_id=result.publication_id,
+        summary_type=result.summary_type,
+        summary_text=result.summary_text,
+        summary=result.summary_text,
+        model_name=result.model_name,
+        model_version=result.model_version,
+        source_fields=result.source_fields or [],
+        confidence_score=result.confidence_score,
+        is_verified=result.is_verified,
+        generated_at=result.generated_at,
+        status=result.status,
+        summary_source=result.source_type,
+        summary_style=result.summary_type,
+        research_document_id=result.research_document_id,
+        document_status=result.document_status,
+        pages_used=result.pages_used or [],
+        chunk_count=result.chunk_count,
+        provider=result.provider,
+        cached=result.cached,
+        warnings=result.warnings or [],
+        processing_job_id=result.processing_job_id,
+        message=result.message,
+    )
+
+
+@router.post("/publications/{publication_id}/summary", response_model=SummaryRead)
 @router.post("/publications/{publication_id}/summarize", response_model=SummaryRead)
 async def summarize_publication(
     publication_id: UUID,
@@ -257,13 +339,17 @@ async def summarize_publication(
 ) -> SummaryRead:
     try:
         result = await service.summarize(
-            publication_id, payload.summary_type, payload.max_length, payload.force_regenerate
+            publication_id,
+            payload.summary_style or payload.summary_type,
+            payload.max_length,
+            payload.force_regenerate or payload.force_reprocess,
+            summary_scope=payload.summary_scope,
         )
     except LookupError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
-    return SummaryRead.model_validate(result)
+    return _summary_response(result)
 
 
 @router.get("/publications/{publication_id}/summary", response_model=SummaryRead | None)

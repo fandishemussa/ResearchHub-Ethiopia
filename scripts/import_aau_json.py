@@ -5,7 +5,7 @@ import asyncio
 import json
 import logging
 import re
-from datetime import date, datetime, timezone
+from datetime import UTC, date, datetime
 from pathlib import Path
 from typing import Any
 
@@ -15,7 +15,6 @@ from researchhub.application.harvest_persistence import (
 )
 from researchhub.infrastructure.persistence.session import SessionLocal
 from researchhub_harvester.connectors.base import NormalizedPublication
-
 
 LOGGER = logging.getLogger(__name__)
 
@@ -164,7 +163,7 @@ def parse_datetime(value: Any) -> datetime:
     """
 
     if not isinstance(value, str) or not value.strip():
-        return datetime.now(timezone.utc)
+        return datetime.now(UTC)
 
     try:
         parsed = datetime.fromisoformat(
@@ -172,7 +171,7 @@ def parse_datetime(value: Any) -> datetime:
         )
 
         if parsed.tzinfo is None:
-            parsed = parsed.replace(tzinfo=timezone.utc)
+            parsed = parsed.replace(tzinfo=UTC)
 
         return parsed
 
@@ -181,7 +180,7 @@ def parse_datetime(value: Any) -> datetime:
             "Unable to parse datetime value: %s",
             value,
         )
-        return datetime.now(timezone.utc)
+        return datetime.now(UTC)
 
 
 def string_list(value: Any) -> list[str]:

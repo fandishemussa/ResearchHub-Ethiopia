@@ -4,11 +4,20 @@ from typing import Any
 
 from fastapi import APIRouter, Depends, Query
 
-from researchhub.api.v1.dependencies import get_analytics_service
+from researchhub.api.v1.dependencies import get_analytics_service, require_permission
 from researchhub.application.services import AnalyticsService
+from researchhub.core.permissions import Permissions
 
-dashboard_router = APIRouter(prefix="/dashboard", tags=["dashboard"])
-statistics_router = APIRouter(prefix="/statistics", tags=["statistics"])
+dashboard_router = APIRouter(
+    prefix="/dashboard",
+    tags=["dashboard"],
+    dependencies=[Depends(require_permission(Permissions.PUBLICATIONS_READ))],
+)
+statistics_router = APIRouter(
+    prefix="/statistics",
+    tags=["statistics"],
+    dependencies=[Depends(require_permission(Permissions.PUBLICATIONS_READ))],
+)
 
 
 @dashboard_router.get("/summary")

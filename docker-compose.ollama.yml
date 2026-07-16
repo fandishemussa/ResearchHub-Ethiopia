@@ -1,6 +1,11 @@
 services:
   ollama:
     image: ollama/ollama:latest
+    environment:
+      HTTP_PROXY: ${OLLAMA_HTTP_PROXY:-}
+      HTTPS_PROXY: ${OLLAMA_HTTPS_PROXY:-}
+      NO_PROXY: ${OLLAMA_NO_PROXY:-localhost,127.0.0.1,ollama,api,postgres,redis}
+      GODEBUG: ${OLLAMA_GODEBUG:-}
     ports:
       - "11434:11434"
     volumes:
@@ -14,6 +19,20 @@ services:
     restart: unless-stopped
 
   api:
+    environment:
+      RESEARCHHUB_AI_CHAT_PROVIDER: ollama
+      RESEARCHHUB_OLLAMA_BASE_URL: http://ollama:11434
+      RESEARCHHUB_OLLAMA_MODEL: qwen2.5:7b
+      RESEARCHHUB_OLLAMA_NUM_CTX: 4096
+      RESEARCHHUB_OLLAMA_MAX_NUM_CTX: 4096
+      RESEARCHHUB_OLLAMA_NUM_PREDICT: 500
+      RESEARCHHUB_OLLAMA_MAX_NUM_PREDICT: 600
+      RESEARCHHUB_OLLAMA_MAX_CONCURRENT_REQUESTS: 1
+      RESEARCHHUB_RAG_RETRIEVAL_CANDIDATES: 20
+      RESEARCHHUB_RAG_RERANK_TOP_K: 5
+      RESEARCHHUB_RAG_MAX_CONTEXT_CHUNKS: 6
+      RESEARCHHUB_RAG_MAX_CONTEXT_TOKENS: 2600
+      RESEARCHHUB_RAG_ENABLE_MEMORY_GUARD: "true"
     depends_on:
       ollama:
         condition: service_healthy

@@ -4,11 +4,16 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
 
-from researchhub.api.v1.dependencies import get_import_operations_service
+from researchhub.api.v1.dependencies import get_import_operations_service, require_permission
 from researchhub.application.import_operations import ImportOperationsService
+from researchhub.core.permissions import Permissions
 from researchhub.domain.schemas import HarvestJobDetail
 
-router = APIRouter(prefix="/import", tags=["metadata-imports"])
+router = APIRouter(
+    prefix="/import",
+    tags=["metadata-imports"],
+    dependencies=[Depends(require_permission(Permissions.IMPORTS_CREATE))],
+)
 
 
 async def _upload(

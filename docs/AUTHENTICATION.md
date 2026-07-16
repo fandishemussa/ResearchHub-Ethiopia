@@ -35,14 +35,15 @@ from the trusted host terminal:
 
 ```powershell
 docker compose run --rm api python /app/scripts/create_admin_user.py `
-  --email admin@example.edu.et `
+  --email admin@haramay.edu.et `
   --username admin `
-  --full-name "Platform Administrator" `
-  --password "use-a-long-random-password"
+  --full-name "Platform Administrator"
 ```
 
-Roles and permissions are attached in Phase 2; the script creates identity
-only and does not falsely grant an unimplemented role.
+The command prompts for the password without echoing it. Automation can inject
+`RESEARCHHUB_ADMIN_PASSWORD` through a secret store. The script idempotently
+seeds the canonical roles, permissions, and grants, then assigns
+`PLATFORM_ADMIN`; it does not accept password command-line arguments.
 
 ## Endpoints
 
@@ -64,6 +65,11 @@ not configured in this checkout, so reset and verification token delivery must
 be connected to an approved institutional mail provider before those user-facing
 flows are production-operational. Tokens are never returned or logged.
 
-Phase 1 deliberately does not protect existing routes. Phase 2 must seed and
-assign the RBAC vocabulary, implement institutional scope dependencies, and
-apply them route-by-route before administrative controls are considered secure.
+The frontend login route stores tokens in tab-scoped `sessionStorage`, validates
+the session before mounting application pages, and adds the bearer token centrally
+to fetch and upload requests. Catalogue reads and all source, harvest, import,
+document, AI, catalogue-write, quality-write, and university-write routes enforce
+the centralized permission vocabulary. University and department
+scope helpers exist, but complete service-level tenant enforcement and negative
+IDOR coverage remain required before multi-tenant deployment. See
+`docs/authorization-matrix.md` and the security review.

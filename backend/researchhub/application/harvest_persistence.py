@@ -167,7 +167,9 @@ class HarvestPersistenceService:
             batch_key = self._batch_key(metadata)
             if batch_key in seen_batch_keys:
                 result.record("duplicate")
-                self._log("info", "harvest_persistence_batch_duplicate", identifier=metadata.external_id)
+                self._log(
+                    "info", "harvest_persistence_batch_duplicate", identifier=metadata.external_id
+                )
                 continue
             seen_batch_keys.add(batch_key)
             try:
@@ -240,7 +242,9 @@ class HarvestPersistenceService:
                 action=action,
                 matched_by=matched_by,
             )
-            return PersistenceOutcome(action=action, publication_id=stored.id, matched_by=matched_by)
+            return PersistenceOutcome(
+                action=action, publication_id=stored.id, matched_by=matched_by
+            )
 
     async def _resolve_university(self, context: HarvestPersistenceContext) -> University:
         """Resolve or create the university for the harvest context."""
@@ -278,7 +282,9 @@ class HarvestPersistenceService:
             offset=0,
         )
         for repository in candidates:
-            if repository.university_id == university.id and _normalize(repository.name) == _normalize(repository_name):
+            if repository.university_id == university.id and _normalize(
+                repository.name
+            ) == _normalize(repository_name):
                 if context.repository_base_url and not repository.base_url:
                     repository.base_url = context.repository_base_url
                     repository.oai_endpoint = context.repository_base_url
@@ -332,7 +338,9 @@ class HarvestPersistenceService:
     ) -> PublicationType | None:
         """Resolve or create publication type vocabulary values."""
 
-        type_name = _metadata_first(metadata, "type") or _metadata_first(metadata, "publication_type")
+        type_name = _metadata_first(metadata, "type") or _metadata_first(
+            metadata, "publication_type"
+        )
         if not type_name:
             return None
         normalized_name = _normalize(type_name)
@@ -346,7 +354,11 @@ class HarvestPersistenceService:
     async def _resolve_license(self, metadata: PublicationMetadata) -> License | None:
         """Resolve or create license vocabulary values."""
 
-        license_name = metadata.license or _metadata_first(metadata, "rights") or _metadata_first(metadata, "license")
+        license_name = (
+            metadata.license
+            or _metadata_first(metadata, "rights")
+            or _metadata_first(metadata, "license")
+        )
         if not license_name:
             return None
         normalized_name = _normalize(license_name)
@@ -425,7 +437,9 @@ class HarvestPersistenceService:
             }
             self.session.add(tombstone)
             await self.session.flush()
-            return PersistenceOutcome(action="deleted", publication_id=tombstone.id, matched_by=None)
+            return PersistenceOutcome(
+                action="deleted", publication_id=tombstone.id, matched_by=None
+            )
 
         old_value = existing.is_deleted
         existing.is_deleted = True
@@ -433,7 +447,9 @@ class HarvestPersistenceService:
         existing.normalized_record = _normalized_record(metadata)
         existing.repository_datestamp = metadata.updated_at
         await self._add_history(existing.id, metadata.source, "is_deleted", old_value, True)
-        return PersistenceOutcome(action="deleted", publication_id=existing.id, matched_by=matched_by)
+        return PersistenceOutcome(
+            action="deleted", publication_id=existing.id, matched_by=matched_by
+        )
 
     def _new_publication(self, metadata: PublicationMetadata) -> Publication:
         """Create a publication shell from metadata."""
@@ -495,6 +511,7 @@ class HarvestPersistenceService:
             },
         }
         changed = False
+        semantic_changed = False
         for field_name, new_value in new_values.items():
             old_value = getattr(stored, field_name)
             if old_value != new_value:
@@ -504,6 +521,16 @@ class HarvestPersistenceService:
                     )
                 setattr(stored, field_name, new_value)
                 changed = True
+                semantic_changed = semantic_changed or field_name in {
+                    "title",
+                    "abstract",
+                    "subjects",
+                    "publication_type_id",
+                }
+        if semantic_changed:
+            stored.embedding_content_hash = None
+            stored.embedding_failure_code = None
+            stored.embedding_failure_message = None
         return changed
 
     async def _sync_authors(self, stored: Publication, metadata: PublicationMetadata) -> None:
@@ -525,6 +552,7 @@ class HarvestPersistenceService:
                     orcid=metadata.orcid if index == 1 else None,
                 )
             )
+            stored.embedding_content_hash = None
             # Track pending associations too. A later author-resolution query
             # can trigger autoflush before this method reaches the database again.
             existing_ids.add(author.id)
@@ -538,6 +566,7 @@ class HarvestPersistenceService:
             if keyword.id in existing_ids:
                 continue
             self.session.add(PublicationKeyword(publication_id=stored.id, keyword_id=keyword.id))
+            stored.embedding_content_hash = None
             existing_ids.add(keyword.id)
 
     async def _resolve_author(self, full_name: str, orcid: str | None) -> Author:
@@ -617,7 +646,9 @@ class HarvestPersistenceService:
         if metadata.external_id:
             return f"source:{metadata.source}:{metadata.external_id}"
         first_author = _normalize(metadata.authors[0]) if metadata.authors else ""
-        return f"title:{_normalize_title(metadata.title)}:{metadata.publication_year}:{first_author}"
+        return (
+            f"title:{_normalize_title(metadata.title)}:{metadata.publication_year}:{first_author}"
+        )
 
     def _log(self, level: str, event: str, **context: Any) -> None:
         """Emit structured logs for the persistence pipeline."""
@@ -667,7 +698,9 @@ def _normalized_record(metadata: PublicationMetadata) -> dict[str, Any]:
         "affiliations": metadata.affiliations,
         "journal": metadata.journal,
         "publisher": metadata.publisher,
-        "publication_date": metadata.publication_date.isoformat() if metadata.publication_date else None,
+        "publication_date": metadata.publication_date.isoformat()
+        if metadata.publication_date
+        else None,
         "publication_year": metadata.publication_year,
         "keywords": metadata.keywords,
         "subjects": metadata.subjects,

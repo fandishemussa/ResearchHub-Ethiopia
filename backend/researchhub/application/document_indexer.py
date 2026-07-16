@@ -51,9 +51,7 @@ def get_embedding_model() -> SentenceTransformer:
             EMBEDDING_MODEL,
         )
 
-        _embedding_model = SentenceTransformer(
-            EMBEDDING_MODEL
-        )
+        _embedding_model = SentenceTransformer(EMBEDDING_MODEL)
 
     return _embedding_model
 
@@ -111,10 +109,7 @@ def clean_text(value: str) -> str:
     value = value.replace("\r\n", "\n")
     value = value.replace("\r", "\n")
 
-    lines = [
-        line.strip()
-        for line in value.splitlines()
-    ]
+    lines = [line.strip() for line in value.splitlines()]
 
     cleaned_lines: list[str] = []
 
@@ -124,9 +119,7 @@ def clean_text(value: str) -> str:
                 cleaned_lines.append("")
             continue
 
-        cleaned_lines.append(
-            " ".join(line.split())
-        )
+        cleaned_lines.append(" ".join(line.split()))
 
     return "\n".join(cleaned_lines).strip()
 
@@ -136,8 +129,8 @@ def extract_pdf_pages(path: Path) -> list[ExtractedPage]:
 
     with fitz.open(path) as document:
         for page_number, page in enumerate(
-                document,
-                start=1,
+            document,
+            start=1,
         ):
             raw_text = page.get_text(
                 "text",
@@ -160,20 +153,16 @@ def extract_pdf_pages(path: Path) -> list[ExtractedPage]:
 
 
 def chunk_pages(
-        pages: list[ExtractedPage],
-        *,
-        chunk_size: int = 3200,
-        overlap: int = 400,
+    pages: list[ExtractedPage],
+    *,
+    chunk_size: int = 3200,
+    overlap: int = 400,
 ) -> list[DocumentChunkData]:
     if chunk_size <= 0:
-        raise ValueError(
-            "chunk_size must be positive"
-        )
+        raise ValueError("chunk_size must be positive")
 
     if overlap < 0 or overlap >= chunk_size:
-        raise ValueError(
-            "overlap must be smaller than chunk_size"
-        )
+        raise ValueError("overlap must be smaller than chunk_size")
 
     chunks: list[DocumentChunkData] = []
     chunk_index = 0
@@ -190,7 +179,7 @@ def chunk_pages(
             end = min(
                 start + chunk_size,
                 len(text_value),
-                )
+            )
 
             if end < len(text_value):
                 paragraph_break = text_value.rfind(
@@ -233,7 +222,7 @@ def chunk_pages(
             start = max(
                 end - overlap,
                 start + 1,
-                )
+            )
 
     return chunks
 
@@ -246,34 +235,28 @@ def estimate_token_count(content: str) -> int:
 
 
 def vector_literal(vector: list[float]) -> str:
-    return "[" + ",".join(
-        f"{value:.10f}"
-        for value in vector
-    ) + "]"
+    return "[" + ",".join(f"{value:.10f}" for value in vector) + "]"
 
 
 async def index_pdf(
-        session: AsyncSession,
-        *,
-        path: Path,
-        source: str,
-        title: str | None = None,
-        external_id: str | None = None,
-        document_url: str | None = None,
-        landing_url: str | None = None,
-        metadata: dict[str, Any] | None = None,
+    session: AsyncSession,
+    *,
+    path: Path,
+    source: str,
+    publication_id: uuid.UUID | None = None,
+    title: str | None = None,
+    external_id: str | None = None,
+    document_url: str | None = None,
+    landing_url: str | None = None,
+    metadata: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     path = path.resolve()
 
     if not path.exists():
-        raise FileNotFoundError(
-            f"File not found: {path}"
-        )
+        raise FileNotFoundError(f"File not found: {path}")
 
     if path.suffix.lower() not in SUPPORTED_EXTENSIONS:
-        raise ValueError(
-            f"Unsupported file type: {path.suffix}"
-        )
+        raise ValueError(f"Unsupported file type: {path.suffix}")
 
     checksum = sha256_file(path)
 
@@ -293,21 +276,26 @@ async def index_pdf(
     existing = existing_result.mappings().first()
 
     if (
-            existing
-            and existing["checksum_sha256"] == checksum
-            and existing["extraction_status"] == "indexed"
+        existing
+        and existing["checksum_sha256"] == checksum
+        and existing["extraction_status"] == "indexed"
     ):
+        if publication_id:
+            await session.execute(
+                text(
+                    "UPDATE research_documents SET publication_id = :publication_id "
+                    "WHERE id = :document_id AND publication_id IS NULL"
+                ),
+                {"publication_id": publication_id, "document_id": existing["id"]},
+            )
+            await session.commit()
         return {
             "document_id": str(existing["id"]),
             "status": "already_indexed",
             "path": str(path),
         }
 
-    document_id = (
-        existing["id"]
-        if existing
-        else uuid.uuid4()
-    )
+    document_id = existing["id"] if existing else uuid.uuid4()
 
     try:
         await session.execute(
@@ -315,6 +303,7 @@ async def index_pdf(
                 """
                 INSERT INTO research_documents (
                     id,
+                    publication_id,
                     source,
                     external_id,
                     title,
@@ -334,6 +323,7 @@ async def index_pdf(
                 )
                 VALUES (
                            :id,
+                           :publication_id,
                            :source,
                            :external_id,
                            :title,
@@ -354,6 +344,7 @@ async def index_pdf(
                 ON CONFLICT (local_path)
                     DO UPDATE SET
                                   source = EXCLUDED.source,
+                                  publication_id = COALESCE(EXCLUDED.publication_id, research_documents.publication_id),
                                   external_id = EXCLUDED.external_id,
                                   title = EXCLUDED.title,
                                   document_url = EXCLUDED.document_url,
@@ -371,6 +362,7 @@ async def index_pdf(
             ),
             {
                 "id": document_id,
+                "publication_id": publication_id,
                 "source": source,
                 "external_id": external_id,
                 "title": clean_document_title(path, title),
@@ -382,32 +374,43 @@ async def index_pdf(
                 "file_extension": path.suffix.lower(),
                 "checksum_sha256": checksum,
                 "file_size_bytes": path.stat().st_size,
-                "metadata_json": json.dumps(
-                    metadata or {}
-                ),
+                "metadata_json": json.dumps(metadata or {}),
                 "downloaded_at": datetime.now(UTC),
             },
         )
+
+        await session.commit()
 
         pages = extract_pdf_pages(path)
         chunks = chunk_pages(pages)
 
         if not pages:
-            raise RuntimeError(
-                "No extractable text found in PDF"
-            )
+            raise RuntimeError("No extractable text found in PDF")
 
         if not chunks:
-            raise RuntimeError(
-                "Text extraction produced no chunks"
-            )
+            raise RuntimeError("Text extraction produced no chunks")
+
+        await session.execute(
+            text(
+                "UPDATE research_documents SET extraction_status = 'chunking', "
+                "last_attempted_at = now(), updated_at = now() WHERE id = :document_id"
+            ),
+            {"document_id": document_id},
+        )
+        await session.commit()
 
         model = get_embedding_model()
 
-        chunk_texts = [
-            chunk.content
-            for chunk in chunks
-        ]
+        chunk_texts = [chunk.content for chunk in chunks]
+
+        await session.execute(
+            text(
+                "UPDATE research_documents SET extraction_status = 'embedding', "
+                "updated_at = now() WHERE id = :document_id"
+            ),
+            {"document_id": document_id},
+        )
+        await session.commit()
 
         embeddings = model.encode(
             chunk_texts,
@@ -429,13 +432,11 @@ async def index_pdf(
         )
 
         for chunk, embedding in zip(
-                chunks,
-                embeddings,
-                strict=True,
+            chunks,
+            embeddings,
+            strict=True,
         ):
-            content_hash = hashlib.sha256(
-                chunk.content.encode("utf-8")
-            ).hexdigest()
+            content_hash = hashlib.sha256(chunk.content.encode("utf-8")).hexdigest()
 
             await session.execute(
                 text(
@@ -481,25 +482,16 @@ async def index_pdf(
                     "page_start": chunk.page_start,
                     "page_end": chunk.page_end,
                     "content": chunk.content,
-                    "character_count": len(
-                        chunk.content
-                    ),
-                    "token_count": estimate_token_count(
-                        chunk.content
-                    ),
-                    "embedding": vector_literal(
-                        embedding.tolist()
-                    ),
+                    "character_count": len(chunk.content),
+                    "token_count": estimate_token_count(chunk.content),
+                    "embedding": vector_literal(embedding.tolist()),
                     "embedding_model": EMBEDDING_MODEL,
                     "content_hash": content_hash,
                     "embedded_at": datetime.now(UTC),
                 },
             )
 
-        total_characters = sum(
-            len(page.text)
-            for page in pages
-        )
+        total_characters = sum(len(page.text) for page in pages)
 
         now = datetime.now(UTC)
 
@@ -512,6 +504,8 @@ async def index_pdf(
                     chunk_count = :chunk_count,
                     extraction_status = 'indexed',
                     extraction_error = NULL,
+                    processing_error_code = NULL,
+                    technical_error = NULL,
                     extracted_at = :now,
                     indexed_at = :now,
                     updated_at = :now
@@ -526,6 +520,15 @@ async def index_pdf(
                 "document_id": document_id,
             },
         )
+
+        if publication_id:
+            await session.execute(
+                text(
+                    "UPDATE publication_summaries SET is_stale = true "
+                    "WHERE publication_id = :publication_id"
+                ),
+                {"publication_id": publication_id},
+            )
 
         await session.commit()
 
@@ -548,12 +551,18 @@ async def index_pdf(
                 UPDATE research_documents
                 SET extraction_status = 'failed',
                     extraction_error = :error,
+                    processing_error_code = :error_code,
+                    technical_error = :technical_error,
+                    retry_count = retry_count + 1,
+                    last_attempted_at = now(),
                     updated_at = now()
                 WHERE local_path = :local_path
                 """
             ),
             {
                 "error": str(exc)[:5000],
+                "error_code": type(exc).__name__[:80],
+                "technical_error": repr(exc)[:5000],
                 "local_path": str(path),
             },
         )

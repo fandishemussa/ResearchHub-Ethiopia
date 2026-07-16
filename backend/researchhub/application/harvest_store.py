@@ -296,6 +296,15 @@ class SQLAlchemyHarvestStore:
     ) -> None:
         """Copy normalized publication fields onto an ORM publication."""
 
+        if stored.id and (
+            stored.title != publication.title
+            or stored.abstract != publication.abstract
+            or stored.subjects != publication.subjects
+        ):
+            stored.embedding_content_hash = None
+            stored.embedding_failure_code = None
+            stored.embedding_failure_message = None
+
         stored.external_id = publication.external_id
         stored.title = publication.title
         stored.abstract = publication.abstract

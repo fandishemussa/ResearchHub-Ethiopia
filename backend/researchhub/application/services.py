@@ -14,6 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 from sqlalchemy.sql import Select
 
+from researchhub.core.config import get_settings
 from researchhub.domain.schemas import (
     ConnectorCreate,
     HarvestRequest,
@@ -447,6 +448,13 @@ class PublicationService:
                 )
 
         await self.session.refresh(publication)
+        from researchhub.application.worker import celery_app
+
+        celery_app.send_task(
+            "researchhub.embeddings.generate_publication",
+            args=[str(publication.id)],
+            task_id=f"publication-embedding-{publication.id}",
+        )
         return publication
 
     async def get(self, publication_id: UUID) -> Publication | None:
@@ -488,10 +496,31 @@ class PublicationService:
 
         if "doi" in values and values["doi"]:
             values = {**values, "doi": normalize_doi(str(values["doi"]))}
+        semantic_fields = {
+            "title",
+            "abstract",
+            "subjects",
+            "publication_type_id",
+        }
+        if semantic_fields.intersection(values):
+            values = {
+                **values,
+                "embedding_content_hash": None,
+                "embedding_failure_code": None,
+                "embedding_failure_message": None,
+            }
         async with transaction(self.session):
             publication = await self.repository.update(publication_id, values)
         if publication:
             await self.session.refresh(publication)
+            if semantic_fields.intersection(values):
+                from researchhub.application.worker import celery_app
+
+                celery_app.send_task(
+                    "researchhub.embeddings.generate_publication",
+                    args=[str(publication.id)],
+                    task_id=f"publication-embedding-{publication.id}",
+                )
         return publication
 
     async def delete(self, publication_id: UUID, *, hard: bool = False) -> bool:
@@ -597,26 +626,85 @@ class SemanticSearchService:
         if min_similarity is not None and not 0 <= min_similarity <= 1:
             raise ValueError("min_similarity must be between 0 and 1")
 
-        query_vector = self.encoder.encode_query(normalized_query)
-        statement = semantic_search_statement(
-            query_vector,
-            limit=limit,
-            source=source,
-            min_similarity=min_similarity,
+        settings = get_settings()
+        semantic_rows: list[tuple[Publication, float]] = []
+        try:
+            query_vector = self.encoder.encode_query(normalized_query)
+            vector_rows = await self.session.execute(
+                semantic_search_statement(
+                    query_vector,
+                    limit=min(limit * 5, 100),
+                    source=source,
+                    min_similarity=min_similarity,
+                )
+            )
+            semantic_rows = [(row[0], float(row[1])) for row in vector_rows.all()]
+        except Exception:
+            semantic_rows = []
+
+        words = [word for word in normalized_query.casefold().split() if len(word) > 2]
+        lexical_filters = [Publication.title.ilike(f"%{word}%") for word in words]
+        lexical_filters.extend(Publication.abstract.ilike(f"%{word}%") for word in words)
+        lexical_statement = select(Publication).where(Publication.is_deleted.is_(False))
+        if lexical_filters:
+            lexical_statement = lexical_statement.where(or_(*lexical_filters))
+        if source:
+            lexical_statement = lexical_statement.where(Publication.source == source)
+        lexical_publications = list(
+            (
+                await self.session.scalars(
+                    lexical_statement.order_by(Publication.updated_at.desc()).limit(100)
+                )
+            ).all()
         )
-        rows = (await self.session.execute(statement)).all()
-        return [
-            {
-                "id": publication.id,
-                "title": publication.title,
-                "abstract_preview": publication.abstract[:500] if publication.abstract else None,
-                "publication_year": publication.publication_year,
-                "source": publication.source,
-                "article_url": publication.article_url,
-                "similarity": float(score),
-            }
-            for publication, score in rows
-        ]
+        candidates: dict[UUID, tuple[Publication, float]] = {
+            publication.id: (publication, float(score)) for publication, score in semantic_rows
+        }
+        for publication in lexical_publications:
+            candidates.setdefault(publication.id, (publication, 0.0))
+
+        ranked: list[dict[str, Any]] = []
+        phrase = normalized_query.casefold()
+        for publication, semantic_score in candidates.values():
+            title = publication.title.casefold()
+            abstract = (publication.abstract or "").casefold()
+            title_matches = sum(word in title for word in words)
+            abstract_matches = sum(word in abstract for word in words)
+            lexical_score = min(
+                1.0,
+                1.0
+                if phrase in title
+                else (title_matches + 0.4 * abstract_matches) / max(len(words), 1),
+            )
+            topics = [str(item).casefold() for item in publication.subjects]
+            keyword_score = (
+                sum(any(word in topic for topic in topics) for word in words) / len(words)
+                if words
+                else 0.0
+            )
+            combined = (
+                settings.semantic_search_weight * semantic_score
+                + settings.lexical_search_weight * lexical_score
+                + settings.keyword_search_weight * keyword_score
+            )
+            ranked.append(
+                {
+                    "id": publication.id,
+                    "title": publication.title,
+                    "abstract_preview": publication.abstract[:500]
+                    if publication.abstract
+                    else None,
+                    "publication_year": publication.publication_year,
+                    "source": publication.source,
+                    "article_url": publication.article_url,
+                    "similarity": combined,
+                    "semantic_score": semantic_score,
+                    "lexical_score": lexical_score,
+                    "keyword_score": keyword_score,
+                    "combined_score": combined,
+                }
+            )
+        return sorted(ranked, key=lambda item: item["combined_score"], reverse=True)[:limit]
 
 
 def publication_similarity_statement(

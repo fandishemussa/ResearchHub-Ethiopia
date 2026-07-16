@@ -3,12 +3,11 @@ from __future__ import annotations
 import argparse
 import asyncio
 
-from sentence_transformers import SentenceTransformer
-from sqlalchemy import text
-
 from researchhub.infrastructure.persistence.session import (
     async_session_factory,
 )
+from sentence_transformers import SentenceTransformer
+from sqlalchemy import text
 
 MODEL_NAME = (
     "sentence-transformers/"

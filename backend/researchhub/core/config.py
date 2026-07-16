@@ -2,7 +2,7 @@
 
 from functools import lru_cache
 
-from pydantic import AnyHttpUrl, Field
+from pydantic import AnyHttpUrl, Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -16,7 +16,9 @@ class Settings(BaseSettings):
     allowed_origins: list[str] = Field(default_factory=list)
 
     database_url: str = "postgresql+asyncpg://researchhub:researchhub@localhost:5432/researchhub"
-    sync_database_url: str = "postgresql+psycopg://researchhub:researchhub@localhost:5432/researchhub"
+    sync_database_url: str = (
+        "postgresql+psycopg://researchhub:researchhub@localhost:5432/researchhub"
+    )
     redis_url: str = "redis://localhost:6379/0"
     instance_id: str | None = None
     api_workers: int = Field(default=1, ge=1, le=64)
@@ -78,11 +80,48 @@ class Settings(BaseSettings):
     ai_enable_openai: bool = False
     ai_enable_ollama: bool = False
     ollama_base_url: AnyHttpUrl = AnyHttpUrl("http://ollama:11434")
+    ollama_model: str = "qwen2.5:7b"
+    ollama_num_ctx: int = Field(default=4096, ge=512, le=4096)
+    ollama_min_num_ctx: int = Field(default=2048, ge=512, le=4096)
+    ollama_max_num_ctx: int = Field(default=4096, ge=512, le=4096)
+    ollama_num_predict: int = Field(default=500, ge=1, le=600)
+    ollama_max_num_predict: int = Field(default=600, ge=1, le=600)
+    ollama_temperature: float = Field(default=0.1, ge=0, le=2)
+    ollama_top_p: float = Field(default=0.9, gt=0, le=1)
+    ollama_repeat_penalty: float = Field(default=1.1, gt=0, le=2)
+    ollama_num_thread: int = Field(default=6, ge=1, le=64)
+    ollama_max_concurrent_requests: int = Field(default=1, ge=1, le=4)
+    ollama_queue_timeout_seconds: float = Field(default=120, gt=0, le=600)
+    ollama_request_timeout_seconds: float = Field(default=240, gt=0, le=900)
+    ollama_min_free_memory_mb: int = Field(default=4096, ge=256)
+    ollama_critical_free_memory_mb: int = Field(default=2048, ge=128)
+    ollama_keep_alive: str = "5m"
+    rag_retrieval_candidates: int = Field(default=20, ge=1, le=100)
+    rag_rerank_top_k: int = Field(default=5, ge=1, le=20)
+    rag_max_context_chunks: int = Field(default=6, ge=1, le=6)
+    rag_max_chunk_tokens: int = Field(default=800, ge=100, le=2000)
+    rag_target_chunk_tokens: int = Field(default=600, ge=100, le=1500)
+    rag_response_token_reserve: int = Field(default=600, ge=100, le=1200)
+    rag_context_safety_margin: int = Field(default=300, ge=50, le=1000)
+    rag_min_evidence_tokens: int = Field(default=500, ge=100, le=2000)
+    rag_max_context_tokens: int = Field(default=2600, ge=100, le=4000)
+    rag_deduplication_threshold: float = Field(default=0.88, ge=0.5, le=1)
+    rag_adjacent_chunk_overlap_threshold: float = Field(default=0.65, ge=0, le=1)
+    rag_enable_dynamic_context: bool = True
+    rag_enable_context_compression: bool = True
+    rag_enable_duplicate_removal: bool = True
+    rag_enable_adjacent_chunk_merging: bool = False
+    rag_enable_memory_guard: bool = True
+    rag_max_history_turns: int = Field(default=2, ge=0, le=10)
+    rag_max_history_tokens: int = Field(default=500, ge=0, le=4000)
+    rag_expose_context_diagnostics: bool = True
     ai_chat_provider: str = "local"
     ai_summary_provider: str = "local"
     ai_embedding_provider: str = "local"
     ai_summary_model: str = "grounded-extractive-v1"
     ai_embedding_batch_size: int = Field(default=32, ge=1, le=512)
+    embedding_maintenance_interval_seconds: int = Field(default=3600, ge=300, le=86400)
+    embedding_maintenance_batch_limit: int = Field(default=500, ge=1, le=5000)
     ai_embedding_normalize: bool = True
     ai_chat_max_context_tokens: int = Field(default=8000, ge=512, le=128000)
     ai_chat_retrieval_limit: int = Field(default=20, ge=1, le=100)
@@ -95,6 +134,14 @@ class Settings(BaseSettings):
     semantic_search_minimum_score: float = Field(default=0.45, ge=0, le=1)
     semantic_search_weight: float = Field(default=0.50, ge=0, le=1)
     lexical_search_weight: float = Field(default=0.25, ge=0, le=1)
+    keyword_search_weight: float = Field(default=0.25, ge=0, le=1)
+    semantic_search_limit: int = Field(default=20, ge=1, le=100)
+    semantic_rerank_enabled: bool = False
+    document_probe_cache_ttl_seconds: int = Field(default=300, ge=10, le=86400)
+    document_probe_redirect_limit: int = Field(default=5, ge=0, le=10)
+    document_download_max_size_mb: int = Field(default=100, ge=1, le=1000)
+    document_storage_path: str = "/app/data/documents"
+    document_probe_trusted_hosts: list[str] = Field(default_factory=list)
     trend_minimum_publications: int = Field(default=3, ge=1)
     trend_cache_ttl_seconds: int = Field(default=3600, ge=60)
     harvest_batch_size: int = Field(default=500, ge=1, le=10_000)
@@ -135,6 +182,36 @@ class Settings(BaseSettings):
     metrics_enabled: bool = True
     metrics_path: str = "/metrics"
     load_test_mode: bool = False
+
+    @model_validator(mode="after")
+    def validate_ollama_context(self) -> "Settings":
+        if self.ollama_min_num_ctx > self.ollama_max_num_ctx:
+            raise ValueError("OLLAMA_MIN_NUM_CTX cannot exceed OLLAMA_MAX_NUM_CTX")
+        if not self.ollama_min_num_ctx <= self.ollama_num_ctx <= self.ollama_max_num_ctx:
+            raise ValueError("OLLAMA_NUM_CTX must be between its minimum and maximum")
+        if self.ollama_num_predict > self.ollama_max_num_predict:
+            raise ValueError("OLLAMA_NUM_PREDICT cannot exceed OLLAMA_MAX_NUM_PREDICT")
+        if self.rag_max_context_tokens >= self.ollama_num_ctx:
+            raise ValueError("RAG_MAX_CONTEXT_TOKENS must be smaller than OLLAMA_NUM_CTX")
+        if self.rag_target_chunk_tokens > self.rag_max_chunk_tokens:
+            raise ValueError("RAG_TARGET_CHUNK_TOKENS cannot exceed RAG_MAX_CHUNK_TOKENS")
+        fixed_reserve = self.rag_response_token_reserve + self.rag_context_safety_margin
+        if fixed_reserve + self.rag_min_evidence_tokens >= self.ollama_num_ctx:
+            raise ValueError("Ollama context must leave space for prompts and minimum evidence")
+        if self.ollama_critical_free_memory_mb >= self.ollama_min_free_memory_mb:
+            raise ValueError(
+                "OLLAMA_CRITICAL_FREE_MEMORY_MB must be below OLLAMA_MIN_FREE_MEMORY_MB"
+            )
+        return self
+
+    @model_validator(mode="after")
+    def validate_search_weights(self) -> "Settings":
+        total = (
+            self.semantic_search_weight + self.lexical_search_weight + self.keyword_search_weight
+        )
+        if abs(total - 1.0) > 0.0001:
+            raise ValueError("Semantic, lexical, and keyword search weights must sum to 1.0")
+        return self
 
     model_config = SettingsConfigDict(
         env_file=".env",

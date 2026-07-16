@@ -1,4 +1,3 @@
-from pathlib import Path
 
 from document_downloader.bdu_handler import rewrite_bdu_url
 from document_downloader.config import SOURCES

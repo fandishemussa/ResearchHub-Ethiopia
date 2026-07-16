@@ -3,6 +3,7 @@ import type {
   AIKeyword,
   PublicationCitation,
   PublicationSummary,
+  EmbeddingAdministrationStatus,
   KeywordPoint,
   Publication,
   PublicationSimilarityResponse,
@@ -18,6 +19,11 @@ import type {
   HarvestEvent,
   HarvestFailure,
   ImportPreview,
+  AuthorizationMatrix,
+  QualityIssuePage,
+  QualitySummary,
+  Researcher,
+  SystemHealth,
 } from "./types";
 import type {
   ChatSessionSummary,
@@ -30,6 +36,14 @@ import type {
   ResearchDocument,
   ResearchDocumentPage,
 } from "./document-types";
+import {
+  authorizationHeader,
+  clearAuthTokens,
+  readAuthTokens,
+  storeAuthTokens,
+  type AuthTokens,
+  type AuthUser,
+} from "./auth";
 
 const baseUrl = (process.env.NEXT_PUBLIC_API_URL || "/backend-api").replace(
   /\/$/,
@@ -43,7 +57,14 @@ const chatRequestTimeoutMs = Number(
 );
 
 export type ApiErrorKind =
-  "network" | "server" | "validation" | "not-found" | "aborted" | "timeout";
+  | "network"
+  | "server"
+  | "validation"
+  | "not-found"
+  | "unauthorized"
+  | "forbidden"
+  | "aborted"
+  | "timeout";
 
 export class ApiError extends Error {
   constructor(
@@ -77,11 +98,15 @@ async function get<T>(path: string, signal?: AbortSignal): Promise<T> {
     const payload: unknown = await response.json().catch(() => null);
     const detail = extractErrorDetail(payload);
     const kind: ApiErrorKind =
-      response.status === 404
-        ? "not-found"
-        : response.status === 400 || response.status === 422
-          ? "validation"
-          : "server";
+      response.status === 401
+        ? "unauthorized"
+        : response.status === 403
+          ? "forbidden"
+          : response.status === 404
+            ? "not-found"
+            : response.status === 400 || response.status === 422
+              ? "validation"
+              : "server";
     throw new ApiError(
       detail || `ResearchHub returned an error (${response.status}).`,
       kind,
@@ -127,14 +152,43 @@ async function request<T>(
       detail || `ResearchHub returned an error (${response.status}).`,
       response.status === 404
         ? "not-found"
-        : response.status < 500
-          ? "validation"
-          : "server",
+        : response.status === 401
+          ? "unauthorized"
+          : response.status === 403
+            ? "forbidden"
+            : response.status < 500
+              ? "validation"
+              : "server",
       response.status,
     );
   }
   if (response.status === 204) return undefined as T;
   return response.json() as Promise<T>;
+}
+
+async function getStatus<T>(path: string, signal?: AbortSignal): Promise<T> {
+  let response: Response;
+  try {
+    response = await fetchWithTimeout(path, {
+      headers: { Accept: "application/json" },
+      signal,
+    });
+  } catch (error) {
+    if (error instanceof DOMException && error.name === "TimeoutError")
+      throw new ApiError("The ResearchHub API request timed out.", "timeout");
+    if (error instanceof DOMException && error.name === "AbortError")
+      throw new ApiError("The request was cancelled.", "aborted");
+    throw new ApiError("Unable to reach the ResearchHub API.", "network");
+  }
+  const payload: unknown = await response.json().catch(() => null);
+  if ((response.ok || response.status === 503) && payload !== null)
+    return payload as T;
+  throw new ApiError(
+    extractErrorDetail(payload) ||
+      `ResearchHub returned an error (${response.status}).`,
+    "server",
+    response.status,
+  );
 }
 
 async function fetchWithTimeout(
@@ -153,7 +207,11 @@ async function fetchWithTimeout(
     timeoutMs,
   );
   try {
-    return await fetch(input, { ...options, signal: controller.signal });
+    return await fetch(input, {
+      ...options,
+      headers: { ...authorizationHeader(), ...options.headers },
+      signal: controller.signal,
+    });
   } finally {
     clearTimeout(timeout);
     parentSignal?.removeEventListener("abort", abortFromParent);
@@ -178,6 +236,40 @@ function extractErrorDetail(payload: unknown): string | undefined {
 }
 
 export const api = {
+  login: async (identifier: string, password: string) => {
+    const form = new URLSearchParams({ username: identifier, password });
+    const tokens = await request<AuthTokens>("/auth/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: form,
+    });
+    storeAuthTokens(tokens);
+    return tokens;
+  },
+  currentUser: (signal?: AbortSignal) => get<AuthUser>("/auth/me", signal),
+  logout: async () => {
+    const tokens = readAuthTokens();
+    try {
+      if (tokens) {
+        await request<void>("/auth/logout", {
+          method: "POST",
+          body: JSON.stringify({ refresh_token: tokens.refresh_token }),
+        });
+      }
+    } finally {
+      clearAuthTokens();
+    }
+  },
+  researchers: (signal?: AbortSignal) =>
+    get<Researcher[]>("/authors?limit=200", signal),
+  qualitySummary: (signal?: AbortSignal) =>
+    get<QualitySummary>("/quality/summary", signal),
+  qualityIssues: (signal?: AbortSignal) =>
+    get<QualityIssuePage>("/quality/issues?limit=20", signal),
+  systemHealth: (signal?: AbortSignal) =>
+    getStatus<SystemHealth>("/backend-health/dependencies", signal),
+  authorizationMatrix: (signal?: AbortSignal) =>
+    get<AuthorizationMatrix>("/auth/authorization-matrix", signal),
   researchDocuments: (params: URLSearchParams, signal?: AbortSignal) =>
     get<ResearchDocumentPage>(`/documents?${params.toString()}`, signal),
   researchDocument: (id: string, signal?: AbortSignal) =>
@@ -336,16 +428,28 @@ export const api = {
     }),
   summarizePublication: (
     id: string,
-    summaryType = "short",
+    summaryType = "structured",
     signal?: AbortSignal,
   ) =>
     request<PublicationSummary>(
-      `/ai/publications/${encodeURIComponent(id)}/summarize`,
+      `/ai/publications/${encodeURIComponent(id)}/summary`,
       {
         method: "POST",
-        body: JSON.stringify({ summary_type: summaryType }),
+        body: JSON.stringify({
+          summary_type: summaryType,
+          summary_style: summaryType,
+          summary_scope: "auto",
+          max_length: 5000,
+        }),
         signal,
       },
+    ),
+  embeddingAdministration: (signal?: AbortSignal) =>
+    get<EmbeddingAdministrationStatus>("/admin/ai/embeddings", signal),
+  generateEmbeddings: (mode: "missing" | "stale" | "failed", limit = 100) =>
+    request<{ status: string; task_id: string }>(
+      `/admin/ai/embeddings/generate?mode=${mode}&limit=${limit}`,
+      { method: "POST" },
     ),
   extractPublicationKeywords: (id: string, signal?: AbortSignal) =>
     request<AIKeyword[]>(
@@ -371,6 +475,8 @@ function uploadFormData<T>(
     const xhr = new XMLHttpRequest();
     xhr.open("POST", `${baseUrl}${path}`);
     xhr.setRequestHeader("Accept", "application/json");
+    const auth = authorizationHeader().Authorization;
+    if (auth) xhr.setRequestHeader("Authorization", auth);
     xhr.timeout = 120000;
     xhr.upload.addEventListener("progress", (event) => {
       if (event.lengthComputable) {
@@ -393,9 +499,13 @@ function uploadFormData<T>(
             `ResearchHub returned an error (${xhr.status}).`,
           xhr.status === 404
             ? "not-found"
-            : xhr.status < 500
-              ? "validation"
-              : "server",
+            : xhr.status === 401
+              ? "unauthorized"
+              : xhr.status === 403
+                ? "forbidden"
+                : xhr.status < 500
+                  ? "validation"
+                  : "server",
           xhr.status,
         ),
       );

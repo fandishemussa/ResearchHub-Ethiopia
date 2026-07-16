@@ -4,8 +4,12 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import os
+from getpass import getpass
 
+from researchhub.application.rbac import assign_role, seed_authorization_vocabulary
 from researchhub.core.auth_security import hash_password
+from researchhub.core.permissions import Roles
 from researchhub.infrastructure.persistence.models import User
 from researchhub.infrastructure.persistence.session import SessionLocal
 from sqlalchemy import func, select
@@ -16,7 +20,11 @@ def arguments() -> argparse.Namespace:
     parser.add_argument("--email", required=True)
     parser.add_argument("--username", required=True)
     parser.add_argument("--full-name", required=True)
-    parser.add_argument("--password", required=True)
+    parser.add_argument(
+        "--password-env",
+        default="RESEARCHHUB_ADMIN_PASSWORD",
+        help="Environment variable containing the password (prompted when unset).",
+    )
     return parser.parse_args()
 
 
@@ -46,13 +54,17 @@ async def create_admin(email: str, username: str, full_name: str, password: str)
             user.is_verified = True
             user.is_suspended = False
             action = "updated"
+        await session.flush()
+        await seed_authorization_vocabulary(session)
+        await assign_role(session, user.id, Roles.PLATFORM_ADMIN)
         await session.commit()
         return action
 
 
 def main() -> None:
     args = arguments()
-    print(asyncio.run(create_admin(args.email, args.username, args.full_name, args.password)))
+    password = os.getenv(args.password_env) or getpass("Administrator password: ")
+    print(asyncio.run(create_admin(args.email, args.username, args.full_name, password)))
 
 
 if __name__ == "__main__":

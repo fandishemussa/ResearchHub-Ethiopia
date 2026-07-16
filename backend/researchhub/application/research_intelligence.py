@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import re
 from collections import Counter
+from dataclasses import dataclass
 from datetime import UTC, datetime
 from decimal import Decimal
 from difflib import SequenceMatcher
@@ -12,11 +13,14 @@ from hashlib import sha256
 from uuid import UUID
 
 from researchhub_ai.text_builder import PublicationTextBuilder
-from sqlalchemy import func, or_, select
+from sqlalchemy import func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
+from researchhub.application.full_text_summary import summarize_document_chunks
+from researchhub.application.publication_documents import PublicationDocumentResolver
 from researchhub.infrastructure.persistence.models import (
+    DocumentChunk,
     DuplicateCandidate,
     Publication,
     PublicationAuthor,
@@ -76,6 +80,31 @@ STOPWORDS = {
     "which",
     "with",
 }
+
+
+@dataclass(slots=True)
+class SummaryOutcome:
+    publication_id: UUID
+    summary_type: str
+    summary_text: str | None
+    source_type: str
+    status: str = "ready"
+    id: UUID | None = None
+    model_name: str | None = None
+    model_version: str | None = None
+    source_fields: list[str] | None = None
+    confidence_score: Decimal | None = None
+    is_verified: bool = False
+    generated_at: datetime | None = None
+    research_document_id: UUID | None = None
+    document_status: str | None = None
+    pages_used: list[int] | None = None
+    chunk_count: int = 0
+    provider: str = "local"
+    cached: bool = False
+    warnings: list[str] | None = None
+    processing_job_id: str | None = None
+    message: str | None = None
 
 
 def publication_content_hash(publication: Publication) -> str:
@@ -226,11 +255,129 @@ class ResearchIntelligenceService:
         return item
 
     async def summarize(
-        self, publication_id: UUID, summary_type: str, max_length: int, force: bool = False
-    ) -> PublicationSummary:
+        self,
+        publication_id: UUID,
+        summary_type: str,
+        max_length: int,
+        force: bool = False,
+        *,
+        summary_scope: str = "auto",
+    ) -> SummaryOutcome:
         publication = await self.publication(publication_id)
         built = PublicationTextBuilder().build_summary_text(publication)
-        content_hash = built.content_hash
+        resolver = PublicationDocumentResolver(self.session)
+        resolved = await resolver.resolve(publication_id)
+
+        if summary_scope in {"auto", "full_text"} and resolved.indexed:
+            chunks = list(
+                (
+                    await self.session.scalars(
+                        select(DocumentChunk)
+                        .where(DocumentChunk.document_id == resolved.research_document_id)
+                        .order_by(
+                            DocumentChunk.page_start.asc().nulls_last(),
+                            DocumentChunk.page_end.asc().nulls_last(),
+                            DocumentChunk.chunk_index,
+                        )
+                    )
+                ).all()
+            )
+            generated = summarize_document_chunks(chunks)
+            content_hash = sha256(
+                f"{resolved.checksum_sha256}:{generated.content_hash}:{summary_type}:summary-v2".encode()
+            ).hexdigest()
+            cached = (
+                None
+                if force
+                else await self.session.scalar(
+                    select(PublicationSummary).where(
+                        PublicationSummary.publication_id == publication_id,
+                        PublicationSummary.summary_type == summary_type,
+                        PublicationSummary.content_hash == content_hash,
+                        PublicationSummary.is_stale.is_(False),
+                    )
+                )
+            )
+            if cached:
+                return self._summary_outcome(cached, resolved.document_status, cached=True)
+            await self.session.execute(
+                update(PublicationSummary)
+                .where(
+                    PublicationSummary.publication_id == publication_id,
+                    PublicationSummary.source_type != "full_text",
+                )
+                .values(is_stale=True)
+            )
+            result = PublicationSummary(
+                publication_id=publication_id,
+                summary_type=summary_type,
+                summary_text=generated.text,
+                model_name="page-aware-extractive-v2",
+                model_version="2",
+                model_provider="local",
+                source_type="full_text",
+                source_fields=["document_chunks"],
+                content_hash=content_hash,
+                confidence_score=Decimal("0.9000"),
+                research_document_id=resolved.research_document_id,
+                document_checksum=resolved.checksum_sha256,
+                pages_used=generated.pages_used,
+                chunk_count=generated.chunk_count,
+                prompt_version="summary-v2",
+            )
+            self.session.add(result)
+            await self.session.commit()
+            await self.session.refresh(result)
+            return self._summary_outcome(result, resolved.document_status)
+
+        processing_job_id: str | None = None
+        if summary_scope in {"auto", "full_text"}:
+            processing_job_id, resolved = await resolver.prepare_for_indexing(resolved)
+        if processing_job_id:
+            return SummaryOutcome(
+                publication_id=publication_id,
+                summary_type=summary_type,
+                summary_text=None,
+                source_type="unavailable",
+                status="processing",
+                research_document_id=resolved.research_document_id,
+                document_status=resolved.document_status or "pending",
+                warnings=resolved.warnings,
+                processing_job_id=processing_job_id,
+                message=(
+                    "The full document is being indexed. The summary will be available when "
+                    "processing completes."
+                ),
+            )
+
+        if summary_scope == "full_text":
+            processing = bool(
+                resolved.research_document_id
+                and resolved.document_status
+                not in {"failed", "restricted", "embargoed", "missing", "corrupted"}
+            )
+            return SummaryOutcome(
+                publication_id=publication_id,
+                summary_type=summary_type,
+                summary_text=None,
+                source_type="unavailable",
+                status="processing" if processing else "unavailable",
+                research_document_id=resolved.research_document_id,
+                document_status=resolved.document_status or "missing",
+                warnings=resolved.warnings,
+                message=(
+                    "The full document is being indexed. The summary will be available when "
+                    "processing completes."
+                    if processing
+                    else "An indexed full document is not available for this publication."
+                ),
+            )
+
+        use_abstract = summary_scope in {"auto", "abstract"} and bool(publication.abstract)
+        source_type = "abstract" if use_abstract else "metadata"
+        content_hash = sha256(
+            f"{built.content_hash}:{source_type}:{summary_type}".encode()
+        ).hexdigest()
         if not force:
             cached = await self.session.scalar(
                 select(PublicationSummary).where(
@@ -239,14 +386,16 @@ class ResearchIntelligenceService:
                     PublicationSummary.content_hash == content_hash,
                 )
             )
-            if cached:
-                return cached
-        source_type = "abstract" if publication.abstract else "metadata"
+            if cached and not cached.is_stale:
+                return self._summary_outcome(cached, resolved.document_status, cached=True)
         result = PublicationSummary(
             publication_id=publication_id,
             summary_type=summary_type,
             summary_text=summarize_text(
-                publication.title, publication.abstract, summary_type, max_length
+                publication.title,
+                publication.abstract if use_abstract else None,
+                summary_type,
+                max_length,
             ),
             model_name="grounded-extractive-v1",
             model_version="1",
@@ -259,7 +408,41 @@ class ResearchIntelligenceService:
         self.session.add(result)
         await self.session.commit()
         await self.session.refresh(result)
-        return result
+        warnings = list(resolved.warnings)
+        if source_type == "abstract" and summary_scope == "auto":
+            warnings.append(
+                "Full text was not available. This summary was generated from the abstract only."
+            )
+        return self._summary_outcome(result, resolved.document_status, warnings=warnings)
+
+    @staticmethod
+    def _summary_outcome(
+        item: PublicationSummary,
+        document_status: str | None,
+        *,
+        cached: bool = False,
+        warnings: list[str] | None = None,
+    ) -> SummaryOutcome:
+        return SummaryOutcome(
+            id=item.id,
+            publication_id=item.publication_id,
+            summary_type=item.summary_type,
+            summary_text=item.edited_text or item.summary_text,
+            source_type=item.source_type,
+            model_name=item.model_name,
+            model_version=item.model_version,
+            source_fields=item.source_fields,
+            confidence_score=item.confidence_score,
+            is_verified=item.is_verified,
+            generated_at=item.generated_at,
+            research_document_id=item.research_document_id,
+            document_status=document_status,
+            pages_used=item.pages_used,
+            chunk_count=item.chunk_count,
+            provider=item.model_provider,
+            cached=cached,
+            warnings=warnings or [],
+        )
 
     async def summaries(self, publication_id: UUID) -> list[PublicationSummary]:
         await self.publication(publication_id)
