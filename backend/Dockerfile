@@ -1,7 +1,7 @@
 # syntax=docker/dockerfile:1
 # Runtime image for the FastAPI API, worker, and scheduler.
 
-FROM python:3.13-slim
+FROM python:3.14-slim
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
