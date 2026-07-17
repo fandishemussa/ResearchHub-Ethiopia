@@ -12,15 +12,13 @@ SOURCES: dict[str, SourceConfig] = {
         metadata_prefix="oai_dc",
     ),
     "wku": SourceConfig(
-    key="wku",
-    name="Wolkite University Research Publication System",
-    kind="wku_rest",
-    base_url="https://rps.wku.edu.et",
-    endpoint=(
-        "https://rps.wku.edu.et/"
-        "server/api/discover/search/objects"
+        key="wku",
+        name="Wolkite University Research Publication System",
+        kind="wku_rest",
+        base_url="https://rps.wku.edu.et",
+        endpoint=("https://rps.wku.edu.et/server/api/discover/search/objects"),
+        metadata_prefix="oai_dc",
     ),
-    metadata_prefix="oai_dc",),
     "aau": SourceConfig(
         key="aau",
         name="Addis Ababa University Electronic Theses and Dissertations",

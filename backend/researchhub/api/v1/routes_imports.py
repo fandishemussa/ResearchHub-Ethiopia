@@ -1,5 +1,6 @@
 """Validated XML, JSON, and CSV metadata import endpoints."""
 
+from typing import Any
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
@@ -64,7 +65,7 @@ async def upload_csv(
 @router.post("/{job_id}/preview")
 async def preview_import(
     job_id: UUID, service: ImportOperationsService = Depends(get_import_operations_service)
-) -> dict:
+) -> dict[str, Any]:
     try:
         return await service.preview(job_id)
     except LookupError as exc:

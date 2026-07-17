@@ -326,14 +326,15 @@ class OAIPMHConnector(MetadataConnector):
 
         root = self._parse_xml(xml_text)
         prefix = metadata_prefix or self.config.metadata_prefix
-        records = [self._parse_record(record, prefix) for record in root.findall(".//oai:record", NS)]
+        records = [
+            self._parse_record(record, prefix) for record in root.findall(".//oai:record", NS)
+        ]
         if records:
             self._log("info", "oai_xml_import_records", count=len(records))
             return records
 
         headers = [
-            self._parse_header_only(header, prefix)
-            for header in root.findall(".//oai:header", NS)
+            self._parse_header_only(header, prefix) for header in root.findall(".//oai:header", NS)
         ]
         self._log("info", "oai_xml_import_headers", count=len(headers))
         return headers
@@ -343,7 +344,9 @@ class OAIPMHConnector(MetadataConnector):
     ) -> list[NormalizedPublication]:
         """Import OAI-PMH XML and return normalized publications."""
 
-        publications = [self.normalize(record) for record in self.import_xml(xml_text, metadata_prefix)]
+        publications = [
+            self.normalize(record) for record in self.import_xml(xml_text, metadata_prefix)
+        ]
         if deduplicate:
             publications = list(self.deduplicate_publications(publications))
         return publications
@@ -354,7 +357,9 @@ class OAIPMHConnector(MetadataConnector):
         now = datetime.now(UTC)
         metadata = raw_record.metadata
         title = normalize_title(self._first(metadata, "title")) or raw_record.identifier
-        dates = metadata.get("date", []) + metadata.get("issued", []) + metadata.get("available", [])
+        dates = (
+            metadata.get("date", []) + metadata.get("issued", []) + metadata.get("available", [])
+        )
         publication_date = next((parsed for parsed in map(parse_date, dates) if parsed), None)
         publication_year = publication_date.year if publication_date else self._first_year(dates)
         author_values = (
@@ -364,9 +369,7 @@ class OAIPMHConnector(MetadataConnector):
         )
         contributor_values = metadata.get("contributor", [])
         authors = [
-            author
-            for author in (normalize_author_name(value) for value in author_values)
-            if author
+            author for author in (normalize_author_name(value) for value in author_values) if author
         ] or [
             author
             for author in (normalize_author_name(value) for value in contributor_values)
@@ -378,7 +381,9 @@ class OAIPMHConnector(MetadataConnector):
             + metadata.get("source", [])
             + metadata.get("bibliographicCitation", [])
         )
-        doi = next((value for value in (normalize_doi(item) for item in identifiers) if value), None)
+        doi = next(
+            (value for value in (normalize_doi(item) for item in identifiers) if value), None
+        )
         urls = [value for value in (normalize_url(item) for item in identifiers) if value]
         pdf_url = next((url for url in urls if url.lower().endswith(".pdf")), None)
         article_url = next((url for url in urls if url != pdf_url), None)
@@ -388,7 +393,9 @@ class OAIPMHConnector(MetadataConnector):
         publisher = self._first(metadata, "publisher")
         journal = self._first(metadata, "source") or self._first(metadata, "isPartOf")
         rights = self._first(metadata, "rights") or self._first(metadata, "license")
-        issn = next((value for value in (normalize_issn(item) for item in identifiers) if value), None)
+        issn = next(
+            (value for value in (normalize_issn(item) for item in identifiers) if value), None
+        )
         isbn = self._first(metadata, "isbn")
         orcid = next(
             (
@@ -479,10 +486,14 @@ class OAIPMHConnector(MetadataConnector):
         if publication.doi:
             return DuplicateKey("doi", publication.doi.casefold())
         if publication.external_id:
-            return DuplicateKey("source_identifier", f"{publication.source}:{publication.external_id}")
+            return DuplicateKey(
+                "source_identifier", f"{publication.source}:{publication.external_id}"
+            )
         title = " ".join(publication.title.casefold().split())
         authors = "|".join(author.casefold() for author in publication.authors[:3])
-        return DuplicateKey("title_year_authors", f"{title}:{publication.publication_year or ''}:{authors}")
+        return DuplicateKey(
+            "title_year_authors", f"{title}:{publication.publication_year or ''}:{authors}"
+        )
 
     def deduplicate_publications(
         self, publications: Iterable[NormalizedPublication]
@@ -542,13 +553,17 @@ class OAIPMHConnector(MetadataConnector):
             status=self.config.max_retries,
             allowed_methods=frozenset({"GET"}),
             status_forcelist=DEFAULT_RETRY_STATUS_CODES,
-            backoff_factor=float(self.config.extra.get("backoff_factor", self.config.backoff_factor)),
+            backoff_factor=float(
+                self.config.extra.get("backoff_factor", self.config.backoff_factor)
+            ),
             respect_retry_after_header=True,
             raise_on_status=False,
         )
         adapter = HTTPAdapter(
             max_retries=retry,
-            pool_connections=int(self.config.extra.get("pool_connections", self.config.pool_connections)),
+            pool_connections=int(
+                self.config.extra.get("pool_connections", self.config.pool_connections)
+            ),
             pool_maxsize=int(self.config.extra.get("pool_maxsize", self.config.pool_maxsize)),
         )
         session.mount("http://", adapter)
@@ -636,7 +651,9 @@ class OAIPMHConnector(MetadataConnector):
                 return root
             except TransientConnectorError as exc:
                 if attempt >= attempts:
-                    self._log("error", "oai_request_retry_exhausted", error=str(exc), attempt=attempt)
+                    self._log(
+                        "error", "oai_request_retry_exhausted", error=str(exc), attempt=attempt
+                    )
                     raise
                 self._backoff(attempt, str(exc))
             except ConnectorError:
@@ -756,7 +773,9 @@ class OAIPMHConnector(MetadataConnector):
         if container is None:
             return None
         token = container.find("oai:resumptionToken", NS)
-        value = (token.text or "").strip() if token is not None else ""
+        if token is None:
+            return None
+        value = (token.text or "").strip()
         if not value:
             return None
         return ResumptionToken(

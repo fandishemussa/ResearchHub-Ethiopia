@@ -33,7 +33,7 @@ def clean_extracted_text(text: str) -> str:
 def extract_pdf(path: Path) -> list[ExtractedPage]:
     pages: list[ExtractedPage] = []
 
-    with fitz.open(path) as document:
+    with fitz.open(str(path)) as document:
         for page_index, page in enumerate(document):
             text = page.get_text(
                 "text",
@@ -54,24 +54,24 @@ def extract_pdf(path: Path) -> list[ExtractedPage]:
 
 
 def extract_docx(path: Path) -> list[ExtractedPage]:
-    document = Document(path)
+    document = Document(str(path))
 
     paragraphs = [
-        paragraph.text.strip()
-        for paragraph in document.paragraphs
-        if paragraph.text.strip()
+        paragraph.text.strip() for paragraph in document.paragraphs if paragraph.text.strip()
     ]
 
-    text = clean_extracted_text(
-        "\n\n".join(paragraphs)
-    )
+    text = clean_extracted_text("\n\n".join(paragraphs))
 
-    return [
-        ExtractedPage(
-            page_number=1,
-            text=text,
-        )
-    ] if text else []
+    return (
+        [
+            ExtractedPage(
+                page_number=1,
+                text=text,
+            )
+        ]
+        if text
+        else []
+    )
 
 
 def extract_document(path: Path) -> list[ExtractedPage]:
@@ -83,6 +83,4 @@ def extract_document(path: Path) -> list[ExtractedPage]:
     if suffix == ".docx":
         return extract_docx(path)
 
-    raise ValueError(
-        f"Unsupported document format: {suffix}"
-    )
+    raise ValueError(f"Unsupported document format: {suffix}")

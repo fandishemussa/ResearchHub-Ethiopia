@@ -32,9 +32,7 @@ async def create_admin(email: str, username: str, full_name: str, password: str)
     normalized_email = email.strip().casefold()
     normalized_username = username.strip().casefold()
     async with SessionLocal() as session:
-        user = await session.scalar(
-            select(User).where(func.lower(User.email) == normalized_email)
-        )
+        user = await session.scalar(select(User).where(func.lower(User.email) == normalized_email))
         if user is None:
             user = User(
                 email=normalized_email,

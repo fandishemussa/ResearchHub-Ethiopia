@@ -33,11 +33,19 @@ def verify(path: Path, *, inspect_archive: bool = True) -> dict[str, object]:
     if inspect_archive:
         if shutil.which("pg_restore") is None:
             raise ValueError("pg_restore was not found on PATH")
-        result = subprocess.run(["pg_restore", "--list", str(backup)], capture_output=True, text=True, check=False)
+        result = subprocess.run(
+            ["pg_restore", "--list", str(backup)], capture_output=True, text=True, check=False
+        )
         if result.returncode != 0 or not result.stdout.strip():
             raise ValueError(f"pg_restore could not read the archive: {result.stderr.strip()}")
         archive_checked = True
-    return {"status": "PASS", "path": str(backup), "sha256": actual, "size_bytes": backup.stat().st_size, "archive_checked": archive_checked}
+    return {
+        "status": "PASS",
+        "path": str(backup),
+        "sha256": actual,
+        "size_bytes": backup.stat().st_size,
+        "archive_checked": archive_checked,
+    }
 
 
 def main() -> int:

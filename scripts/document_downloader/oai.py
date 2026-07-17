@@ -20,10 +20,14 @@ def _text_values(node: ET.Element, tag: str) -> list[str]:
 def _choose_landing_url(external_id: str, identifiers: list[str]) -> str | None:
     suffix = external_id.rsplit(":", 1)[-1]
     for identifier in identifiers:
-        if identifier.startswith(("http://", "https://")) and identifier.rstrip("/").endswith(suffix):
+        if identifier.startswith(("http://", "https://")) and identifier.rstrip("/").endswith(
+            suffix
+        ):
             return identifier
     for identifier in identifiers:
-        if identifier.startswith(("http://", "https://")) and ("handle" in identifier or "/items/" in identifier):
+        if identifier.startswith(("http://", "https://")) and (
+            "handle" in identifier or "/items/" in identifier
+        ):
             return identifier
     return next((value for value in identifiers if value.startswith(("http://", "https://"))), None)
 
@@ -51,7 +55,9 @@ def iter_oai_publications(
             if set_spec:
                 params["set"] = set_spec
 
-        response = client.request("GET", source.endpoint, params=params, headers={"Accept": "application/xml, text/xml"})
+        response = client.request(
+            "GET", source.endpoint, params=params, headers={"Accept": "application/xml, text/xml"}
+        )
         content = response.content
         response.close()
         try:
@@ -106,4 +112,8 @@ def iter_oai_publications(
         if token in seen_tokens:
             raise RuntimeError(f"Repeated OAI-PMH resumption token detected: {token}")
         seen_tokens.add(token)
-        LOGGER.info("Following OAI resumption token (cursor=%s, completeListSize=%s)", token_node.attrib.get("cursor"), token_node.attrib.get("completeListSize"))
+        LOGGER.info(
+            "Following OAI resumption token (cursor=%s, completeListSize=%s)",
+            token_node.attrib.get("cursor"),
+            token_node.attrib.get("completeListSize"),
+        )

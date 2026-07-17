@@ -20,4 +20,3 @@ async def transaction(session: AsyncSession) -> AsyncIterator[None]:
         return
     async with session.begin():
         yield
-

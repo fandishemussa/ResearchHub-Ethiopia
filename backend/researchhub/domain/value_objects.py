@@ -39,4 +39,3 @@ def normalize_orcid(value: str | None) -> str | None:
         return None
     match = ORCID_RE.search(value.strip())
     return match.group(0).upper() if match else None
-

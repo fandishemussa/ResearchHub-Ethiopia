@@ -105,9 +105,9 @@ class FakeEmbeddingSession:
 
 def test_whitespace_and_publication_text_normalization() -> None:
     assert normalize_whitespace("  soil\n  health  ") == "soil health"
-    assert build_publication_text(" A  title ", None, [" Public  Health ", 3, "public health", "Soil"]) == (
-        "Title: A title\nAbstract: \nSubjects: Public Health; Soil"
-    )
+    assert build_publication_text(
+        " A  title ", None, [" Public  Health ", 3, "public health", "Soil"]
+    ) == ("Title: A title\nAbstract: \nSubjects: Public Health; Soil")
     assert normalize_subjects("not-a-list") == []
 
 
@@ -116,7 +116,9 @@ def test_publication_text_requires_title() -> None:
         build_publication_text("  ", "abstract", [])
 
 
-def test_encoder_uses_normalized_inference_and_validates_dimension(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_encoder_uses_normalized_inference_and_validates_dimension(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     torch_module = ModuleType("torch")
     torch_module.inference_mode = nullcontext  # type: ignore[attr-defined]
     monkeypatch.setitem(sys.modules, "torch", torch_module)
@@ -136,8 +138,14 @@ def test_encoder_uses_normalized_inference_and_validates_dimension(monkeypatch: 
 
 def test_candidate_query_skip_existing_force_source_and_keyset() -> None:
     after_id = uuid4()
-    skipped = str(candidate_statement(source="aau-etd", force=False, after_id=after_id, limit=300).compile(dialect=postgresql.dialect()))
-    forced = str(candidate_statement(source="aau-etd", force=True).compile(dialect=postgresql.dialect()))
+    skipped = str(
+        candidate_statement(source="aau-etd", force=False, after_id=after_id, limit=300).compile(
+            dialect=postgresql.dialect()
+        )
+    )
+    forced = str(
+        candidate_statement(source="aau-etd", force=True).compile(dialect=postgresql.dialect())
+    )
     assert "publications.embedding IS NULL" in skipped
     assert "publications.source" in skipped
     assert "publications.id >" in skipped
@@ -204,7 +212,10 @@ def test_similarity_input_validation(kwargs: dict[str, object]) -> None:
 
 def test_processor_respects_database_batch_boundaries() -> None:
     pages = [
-        [Publication(id=uuid4(), title=f"Title {index}", source="aau-etd", source_type="test") for index in range(2)],
+        [
+            Publication(id=uuid4(), title=f"Title {index}", source="aau-etd", source_type="test")
+            for index in range(2)
+        ],
         [Publication(id=uuid4(), title="Title 3", source="aau-etd", source_type="test")],
     ]
     pages[0].sort(key=lambda item: item.id)
@@ -256,8 +267,13 @@ def test_semantic_search_rejects_blank_query_before_database() -> None:
 
 def test_semantic_response_excludes_raw_vectors() -> None:
     result = SemanticSearchResult(
-        id=uuid4(), title="Research", abstract_preview="Preview", publication_year=2024,
-        source="aau-etd", article_url="https://example.org", similarity=0.83456,
+        id=uuid4(),
+        title="Research",
+        abstract_preview="Preview",
+        publication_year=2024,
+        source="aau-etd",
+        article_url="https://example.org",
+        similarity=0.83456,
     )
     response = SemanticSearchResponse(query="research", model="test", count=1, results=[result])
     payload = response.model_dump()

@@ -96,4 +96,7 @@ def sha256_file(path: Path, chunk_size: int = 1024 * 1024) -> str:
 
 def looks_like_pdf(first_bytes: bytes, content_type: str | None) -> bool:
     """Backward-compatible PDF detector used by older tests/callers."""
-    return first_bytes.startswith(b"%PDF-") or normalize_content_type(content_type) == "application/pdf"
+    return (
+        first_bytes.startswith(b"%PDF-")
+        or normalize_content_type(content_type) == "application/pdf"
+    )

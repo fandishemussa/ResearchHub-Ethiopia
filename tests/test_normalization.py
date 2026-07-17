@@ -44,9 +44,10 @@ class NormalizationTests(unittest.TestCase):
 
         self.assertEqual(parse_date("2023-05").isoformat(), "2023-05-01")
         self.assertEqual(normalize_language("Amharic"), "am")
-        self.assertEqual(split_terms(["soil; water, climate", "soil"]), ["soil", "water", "climate"])
+        self.assertEqual(
+            split_terms(["soil; water, climate", "soil"]), ["soil", "water", "climate"]
+        )
 
 
 if __name__ == "__main__":
     unittest.main()
-

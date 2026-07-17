@@ -24,9 +24,7 @@ def dspace_item(identifier: str, title: str, modified: str) -> dict[str, object]
             "dc.contributor.author": [{"value": "Kelemework Shimelis"}],
             "dc.date.issued": [{"value": "2023-06"}],
             "dc.description.abstract": [{"value": "Service quality research"}],
-            "dc.identifier.uri": [
-                {"value": f"https://example.edu/handle/123456789/{identifier}"}
-            ],
+            "dc.identifier.uri": [{"value": f"https://example.edu/handle/123456789/{identifier}"}],
             "dc.language.iso": [{"value": "en_US"}],
             "dc.publisher": [{"value": "Addis Ababa University"}],
             "dc.subject": [{"value": "Service Quality"}],
@@ -45,9 +43,7 @@ def discovery_page(
         "_embedded": {
             "searchResult": {
                 "_embedded": {
-                    "objects": [
-                        {"_embedded": {"indexableObject": item}} for item in items
-                    ]
+                    "objects": [{"_embedded": {"indexableObject": item}} for item in items]
                 },
                 "page": {
                     "number": page,
@@ -67,8 +63,7 @@ def connector_with_transport(handler: httpx.MockTransport) -> DSpaceDiscoveryCon
             code="aau-rest",
             name="AAU REST",
             base_url=(
-                "https://example.edu/server/api/discover/search/objects"
-                "?query=%2A&page=0&size=1"
+                "https://example.edu/server/api/discover/search/objects?query=%2A&page=0&size=1"
             ),
             source_type="dspace_discovery",
             extra={"page_size": 100},
@@ -103,10 +98,7 @@ def test_collect_paginates_filters_incrementally_and_normalizes_dublin_core() ->
 
     async def run() -> tuple[list[object], DSpaceDiscoveryConnector]:
         connector = connector_with_transport(httpx.MockTransport(handler))
-        records = [
-            record
-            async for record in connector.collect(from_date=date(2026, 7, 1))
-        ]
+        records = [record async for record in connector.collect(from_date=date(2026, 7, 1))]
         return records, connector
 
     records, connector = asyncio.run(run())

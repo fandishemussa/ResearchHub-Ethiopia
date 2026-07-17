@@ -23,16 +23,10 @@ engine = create_async_engine(
         "server_settings": {
             "statement_timeout": str(settings.db_statement_timeout_ms),
             "lock_timeout": str(settings.db_lock_timeout_ms),
-            "idle_in_transaction_session_timeout": str(
-                settings.db_idle_transaction_timeout_ms
-            ),
+            "idle_in_transaction_session_timeout": str(settings.db_idle_transaction_timeout_ms),
             "application_name": settings.app_name,
         },
-        **(
-            {"statement_cache_size": 0}
-            if settings.db_use_pgbouncer
-            else {}
-        ),
+        **({"statement_cache_size": 0} if settings.db_use_pgbouncer else {}),
     },
 )
 

@@ -190,11 +190,7 @@ class AlembicMigrationTests(unittest.TestCase):
         """The storage layer migration contains expected composite indexes."""
 
         migration = (
-            ROOT
-            / "backend"
-            / "alembic"
-            / "versions"
-            / "0002_storage_layer_indexes.py"
+            ROOT / "backend" / "alembic" / "versions" / "0002_storage_layer_indexes.py"
         ).read_text(encoding="utf-8")
 
         self.assertIn("0002_storage_layer_indexes", migration)
@@ -204,4 +200,3 @@ class AlembicMigrationTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
-

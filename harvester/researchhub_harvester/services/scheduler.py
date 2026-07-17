@@ -41,7 +41,10 @@ class HarvestScheduler:
     def register_connector(self, definition: HarvestConnectorDefinition) -> None:
         """Register one connector schedule."""
 
-        trigger = build_trigger(definition.schedule)
+        schedule = definition.schedule
+        if schedule is None:
+            raise ValueError(f"Connector {definition.code!r} does not define a schedule")
+        trigger = build_trigger(schedule)
         self.scheduler.add_job(
             self.runner,
             trigger=trigger,
@@ -122,4 +125,3 @@ def _run_connector_blocking(engine: HarvestEngine, connector_code: str) -> None:
     """Run one async connector job from APScheduler's sync worker thread."""
 
     asyncio.run(engine.run_connector(connector_code))
-

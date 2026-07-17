@@ -252,12 +252,17 @@ class OAIPMHConnectorTests(unittest.TestCase):
             )
         )
 
-        self.assertEqual([record.identifier for record in records], ["oai:repo.example.edu:1", "oai:repo.example.edu:2"])
+        self.assertEqual(
+            [record.identifier for record in records],
+            ["oai:repo.example.edu:1", "oai:repo.example.edu:2"],
+        )
         session = connector.session
         self.assertEqual(session.requests[0]["params"]["from"], "2025-01-01")
         self.assertEqual(session.requests[0]["params"]["until"], "2025-12-31")
         self.assertEqual(session.requests[0]["params"]["set"], "com_123456789_1")
-        self.assertEqual(session.requests[1]["params"], {"verb": "ListRecords", "resumptionToken": "TOKEN-1"})
+        self.assertEqual(
+            session.requests[1]["params"], {"verb": "ListRecords", "resumptionToken": "TOKEN-1"}
+        )
 
     def test_retry_strategy_uses_exponential_backoff(self) -> None:
         """Transient HTTP failures retry with exponential backoff."""
@@ -367,4 +372,3 @@ class OAIPMHConnectorTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
-

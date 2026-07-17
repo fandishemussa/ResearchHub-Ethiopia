@@ -68,4 +68,3 @@ class ORCIDConnector(NotImplementedProviderConnector):
     """ORCID extension point."""
 
     provider_name = "ORCID"
-

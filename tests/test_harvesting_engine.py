@@ -31,7 +31,9 @@ from researchhub_harvester.services.engine import (  # noqa: E402
 from researchhub_harvester.services.scheduler import build_trigger  # noqa: E402
 
 
-def publication(identifier: str, doi: str | None = None, title: str = "Soil research") -> NormalizedPublication:
+def publication(
+    identifier: str, doi: str | None = None, title: str = "Soil research"
+) -> NormalizedPublication:
     """Create a normalized publication for engine tests."""
 
     now = datetime.now(UTC)
@@ -156,7 +158,13 @@ class InMemoryHarvestStore:
         """Record a structured log."""
 
         self.logs.append(
-            {"job_id": job_id, "level": level, "event": event, "message": message, "context": context}
+            {
+                "job_id": job_id,
+                "level": level,
+                "event": event,
+                "message": message,
+                "context": context,
+            }
         )
 
     async def publication_exists(self, publication: NormalizedPublication) -> bool:
@@ -216,7 +224,9 @@ class HarvestingEngineTests(unittest.TestCase):
         self.assertEqual(config.max_concurrent_connectors, 2)
         self.assertEqual(config.job_max_attempts, 4)
         self.assertEqual(config.connectors[0].from_date.isoformat(), "2025-01-01")
-        self.assertEqual(config.connectors[0].to_connector_config().base_url, "https://repo.example.edu/oai")
+        self.assertEqual(
+            config.connectors[0].to_connector_config().base_url, "https://repo.example.edu/oai"
+        )
 
     def test_run_connector_stores_publications_and_skips_in_run_duplicates(self) -> None:
         """A connector run stores one copy of duplicate DOI records."""
@@ -236,7 +246,9 @@ class HarvestingEngineTests(unittest.TestCase):
             }
         )
 
-        def factory(connector_type: str, definition: HarvestConnectorDefinition) -> MetadataConnector:
+        def factory(
+            connector_type: str, definition: HarvestConnectorDefinition
+        ) -> MetadataConnector:
             return FakeConnector(
                 definition.to_connector_config(),
                 [
@@ -245,7 +257,9 @@ class HarvestingEngineTests(unittest.TestCase):
                 ],
             )
 
-        report = asyncio.run(HarvestEngine(config, store, connector_factory=factory).run_connector("c1"))
+        report = asyncio.run(
+            HarvestEngine(config, store, connector_factory=factory).run_connector("c1")
+        )
 
         self.assertEqual(report.status, "succeeded")
         self.assertEqual(report.records_seen, 2)
@@ -275,7 +289,9 @@ class HarvestingEngineTests(unittest.TestCase):
         )
         calls = {"count": 0}
 
-        def factory(connector_type: str, definition: HarvestConnectorDefinition) -> MetadataConnector:
+        def factory(
+            connector_type: str, definition: HarvestConnectorDefinition
+        ) -> MetadataConnector:
             calls["count"] += 1
             return FakeConnector(
                 definition.to_connector_config(),
@@ -283,7 +299,9 @@ class HarvestingEngineTests(unittest.TestCase):
                 fail=calls["count"] == 1,
             )
 
-        report = asyncio.run(HarvestEngine(config, store, connector_factory=factory).run_connector("retry-me"))
+        report = asyncio.run(
+            HarvestEngine(config, store, connector_factory=factory).run_connector("retry-me")
+        )
 
         self.assertEqual(report.status, "succeeded")
         self.assertEqual(report.attempts, 2)
@@ -316,7 +334,9 @@ class HarvestingEngineTests(unittest.TestCase):
             }
         )
 
-        def factory(connector_type: str, definition: HarvestConnectorDefinition) -> MetadataConnector:
+        def factory(
+            connector_type: str, definition: HarvestConnectorDefinition
+        ) -> MetadataConnector:
             return FakeConnector(
                 definition.to_connector_config(),
                 [publication(f"{definition.code}-1", f"10.1234/{definition.code}")],
@@ -342,4 +362,3 @@ class HarvestingEngineTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
-

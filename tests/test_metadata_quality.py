@@ -315,11 +315,7 @@ class QualityRepositoryTests(unittest.TestCase):
         """The migration contains dimension scores, grade, issues, and history columns."""
 
         migration = (
-            ROOT
-            / "backend"
-            / "alembic"
-            / "versions"
-            / "0004_metadata_quality_assessment.py"
+            ROOT / "backend" / "alembic" / "versions" / "0004_metadata_quality_assessment.py"
         ).read_text(encoding="utf-8")
 
         self.assertIn("completeness_score", migration)

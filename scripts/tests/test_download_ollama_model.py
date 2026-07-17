@@ -21,6 +21,4 @@ def test_sha256_file_hashes_the_raw_file_bytes(tmp_path: Path) -> None:
     blob = tmp_path / "blob"
     blob.write_bytes(b"researchhub")
 
-    assert sha256_file(blob) == (
-        "5dea4da181cdb2864f9571a90917b76008bcfbd1a8f3a2f00e6137aad3604818"
-    )
+    assert sha256_file(blob) == ("5dea4da181cdb2864f9571a90917b76008bcfbd1a8f3a2f00e6137aad3604818")

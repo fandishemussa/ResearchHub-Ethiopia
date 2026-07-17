@@ -21,9 +21,7 @@ def upgrade() -> None:
         "harvest_jobs",
         ["connector_id"],
         unique=True,
-        postgresql_where=sa.text(
-            "status IN ('pending', 'queued', 'running', 'retrying')"
-        ),
+        postgresql_where=sa.text("status IN ('pending', 'queued', 'running', 'retrying')"),
     )
     op.create_index(
         "ix_publications_active_updated_id",

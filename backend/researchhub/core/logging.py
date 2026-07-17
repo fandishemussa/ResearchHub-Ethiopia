@@ -2,7 +2,7 @@
 
 import logging
 import sys
-from typing import Any
+from typing import Any, cast
 
 import structlog
 
@@ -36,5 +36,4 @@ def configure_logging(log_level: str = "INFO") -> None:
 def get_logger(name: str, **context: Any) -> structlog.stdlib.BoundLogger:
     """Return a logger pre-bound with local context."""
 
-    return structlog.get_logger(name).bind(**context)
-
+    return cast(structlog.stdlib.BoundLogger, structlog.get_logger(name).bind(**context))

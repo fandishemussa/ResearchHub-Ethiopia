@@ -45,19 +45,21 @@ class SemanticPublicationService:
             return self._embedding_search(query, docs, limit)
         return self._lexical_search(query, docs, limit)
 
-    def generate_keywords(self, title: str, abstract: str | None = None, limit: int = 8) -> list[str]:
+    def generate_keywords(
+        self, title: str, abstract: str | None = None, limit: int = 8
+    ) -> list[str]:
         """Generate first-pass keywords from title and abstract without an LLM dependency."""
 
         text = f"{title} {abstract or ''}".casefold()
         tokens = [
-            token
-            for token in re.findall(r"[a-z][a-z-]{3,}", text)
-            if token not in _STOPWORDS
+            token for token in re.findall(r"[a-z][a-z-]{3,}", text) if token not in _STOPWORDS
         ]
         counts: dict[str, int] = {}
         for token in tokens:
             counts[token] = counts.get(token, 0) + 1
-        return [term for term, _ in sorted(counts.items(), key=lambda item: (-item[1], item[0]))[:limit]]
+        return [
+            term for term, _ in sorted(counts.items(), key=lambda item: (-item[1], item[0]))[:limit]
+        ]
 
     def enrich_metadata(self, document: SemanticDocument) -> dict[str, Any]:
         """Return deterministic metadata enrichment suggestions."""
@@ -101,7 +103,10 @@ class SemanticPublicationService:
         """Rank documents with sentence-transformer embeddings."""
 
         texts = [query, *[document.text for document in documents]]
-        embeddings = self._model.encode(texts, normalize_embeddings=True)
+        model = self._model
+        if model is None:
+            raise RuntimeError("Semantic model is not loaded")
+        embeddings = model.encode(texts, normalize_embeddings=True)
         query_embedding = embeddings[0]
         scored = [
             (document, float(query_embedding @ embedding))
@@ -160,4 +165,3 @@ _STOPWORDS = {
     "using",
     "with",
 }
-

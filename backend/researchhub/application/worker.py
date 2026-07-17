@@ -9,7 +9,7 @@ from typing import Any
 from uuid import UUID
 
 import httpx
-from celery import Celery
+from celery import Celery, Task
 from researchhub_ai.embeddings import get_embedding_service
 from researchhub_harvester.config import (
     HarvestConnectorDefinition,
@@ -89,7 +89,8 @@ celery_app.conf.beat_schedule = {
 # ---------------------------------------------------------------------------
 
 
-@celery_app.task(
+# Celery does not publish typing for its task decorator; the function remains fully annotated.
+@celery_app.task(  # type: ignore[untyped-decorator]
     name="researchhub.documents.download_publication",
     queue="documents",
     bind=True,
@@ -98,7 +99,9 @@ celery_app.conf.beat_schedule = {
     retry_jitter=True,
     retry_kwargs={"max_retries": 3},
 )
-def download_publication_document(self, document_id: str, publication_id: str) -> dict[str, Any]:
+def download_publication_document(
+    self: Task, document_id: str, publication_id: str
+) -> dict[str, Any]:
     """Download one pre-probed PDF and continue through the canonical indexer."""
 
     return _run_task(_download_publication_document(document_id, publication_id))
@@ -202,7 +205,8 @@ async def _download_publication_document(document_id: str, publication_id: str) 
             raise
 
 
-@celery_app.task(
+# Celery does not publish typing for its task decorator; the function remains fully annotated.
+@celery_app.task(  # type: ignore[untyped-decorator]
     name="researchhub.documents.index_file",
     queue="documents",
     bind=True,
@@ -212,7 +216,7 @@ async def _download_publication_document(document_id: str, publication_id: str) 
     retry_kwargs={"max_retries": 3},
 )
 def index_document_file(
-    self,
+    self: Task,
     file_path: str,
     source: str,
     publication_id: str | None = None,
@@ -279,7 +283,10 @@ async def _index_document_file(
 # ---------------------------------------------------------------------------
 
 
-@celery_app.task(name="researchhub.healthcheck")
+# Celery does not publish typing for its task decorator; the function remains fully annotated.
+@celery_app.task(  # type: ignore[untyped-decorator]
+    name="researchhub.healthcheck"
+)
 def healthcheck() -> str:
     """Return a simple worker health signal."""
 
@@ -291,7 +298,10 @@ def healthcheck() -> str:
 # ---------------------------------------------------------------------------
 
 
-@celery_app.task(name="researchhub.harvest.run_config")
+# Celery does not publish typing for its task decorator; the function remains fully annotated.
+@celery_app.task(  # type: ignore[untyped-decorator]
+    name="researchhub.harvest.run_config"
+)
 def run_harvest_config(
     config_path: str | None = None,
 ) -> dict[str, object]:
@@ -305,7 +315,10 @@ def run_harvest_config(
     return _run_task(_run_all(path))
 
 
-@celery_app.task(name="researchhub.harvest.run_connector")
+# Celery does not publish typing for its task decorator; the function remains fully annotated.
+@celery_app.task(  # type: ignore[untyped-decorator]
+    name="researchhub.harvest.run_connector"
+)
 def run_harvest_connector(
     connector_code: str,
     config_path: str | None = None,
@@ -349,7 +362,10 @@ async def _run_one(
     return report.asdict()
 
 
-@celery_app.task(name="researchhub.harvest.run_source")
+# Celery does not publish typing for its task decorator; the function remains fully annotated.
+@celery_app.task(  # type: ignore[untyped-decorator]
+    name="researchhub.harvest.run_source"
+)
 def run_source_harvest(job_id: str) -> dict[str, object]:
     """Execute one database-configured source harvest."""
 
@@ -435,7 +451,10 @@ async def _run_source_harvest(job_id: str) -> dict[str, object]:
 # ---------------------------------------------------------------------------
 
 
-@celery_app.task(name="researchhub.embeddings.generate")
+# Celery does not publish typing for its task decorator; the function remains fully annotated.
+@celery_app.task(  # type: ignore[untyped-decorator]
+    name="researchhub.embeddings.generate"
+)
 def generate_embeddings(
     source: str | None = None,
     university_id: str | None = None,
@@ -462,7 +481,8 @@ def generate_embeddings(
     )
 
 
-@celery_app.task(
+# Celery does not publish typing for its task decorator; the function remains fully annotated.
+@celery_app.task(  # type: ignore[untyped-decorator]
     name="researchhub.embeddings.generate_publication",
     queue="ai_embeddings",
     autoretry_for=(RuntimeError,),

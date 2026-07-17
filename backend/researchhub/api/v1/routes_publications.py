@@ -37,9 +37,7 @@ def publication_response(
     resolved_keywords = keywords
     if resolved_keywords is None:
         resolved_keywords = [
-            link.keyword.term
-            for link in publication.keywords
-            if link.keyword and link.keyword.term
+            link.keyword.term for link in publication.keywords if link.keyword and link.keyword.term
         ]
 
     return PublicationRead.model_validate(

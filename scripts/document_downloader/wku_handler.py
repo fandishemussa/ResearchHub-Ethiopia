@@ -24,27 +24,18 @@ SUPPORTED_DOCUMENT_EXTENSIONS = {
 SUPPORTED_DOCUMENT_MIME_TYPES = {
     "application/pdf",
     "application/msword",
-    (
-        "application/vnd.openxmlformats-officedocument."
-        "wordprocessingml.document"
-    ),
+    ("application/vnd.openxmlformats-officedocument.wordprocessingml.document"),
 }
 
 
 def _api_base(source: SourceConfig) -> str:
-    return (
-        f"{source.base_url.rstrip('/')}"
-        "/server/api"
-    )
+    return f"{source.base_url.rstrip('/')}/server/api"
 
 
 def _discover_endpoint(
     source: SourceConfig,
 ) -> str:
-    return (
-        f"{_api_base(source)}"
-        "/discover/search/objects"
-    )
+    return f"{_api_base(source)}/discover/search/objects"
 
 
 def _normalize_content_type(
@@ -53,12 +44,7 @@ def _normalize_content_type(
     if not value:
         return ""
 
-    return (
-        value
-        .split(";", 1)[0]
-        .strip()
-        .lower()
-    )
+    return value.split(";", 1)[0].strip().lower()
 
 
 def _metadata_values(
@@ -87,10 +73,7 @@ def _metadata_values(
         if not isinstance(entry, dict):
             continue
 
-        value = str(
-            entry.get("value")
-            or ""
-        ).strip()
+        value = str(entry.get("value") or "").strip()
 
         if value:
             values.append(value)
@@ -126,19 +109,13 @@ def _extract_search_result(
         {},
     )
 
-    return (
-        search_result
-        if isinstance(search_result, dict)
-        else {}
-    )
+    return search_result if isinstance(search_result, dict) else {}
 
 
 def _extract_search_items(
     payload: dict[str, Any],
 ) -> list[dict[str, Any]]:
-    search_result = _extract_search_result(
-        payload
-    )
+    search_result = _extract_search_result(payload)
 
     embedded = search_result.get(
         "_embedded",
@@ -224,11 +201,7 @@ def _extract_embedded_list(
     if not isinstance(values, list):
         return []
 
-    return [
-        value
-        for value in values
-        if isinstance(value, dict)
-    ]
+    return [value for value in values if isinstance(value, dict)]
 
 
 def _normalize_handle(
@@ -247,21 +220,12 @@ def _normalize_handle(
         "https://hdl.handle.net/",
     ):
         if cleaned.startswith(prefix):
-            return (
-                cleaned[
-                    len(prefix):
-                ]
-                .strip("/")
-            )
+            return cleaned[len(prefix) :].strip("/")
 
     parsed = urlparse(cleaned)
 
     if "/handle/" in parsed.path:
-        return (
-            parsed.path
-            .split("/handle/", 1)[1]
-            .strip("/")
-        )
+        return parsed.path.split("/handle/", 1)[1].strip("/")
 
     if "/" in cleaned:
         return cleaned.strip("/")
@@ -272,12 +236,7 @@ def _normalize_handle(
 def _select_item_handle(
     item: dict[str, Any],
 ) -> str | None:
-    api_handle = _normalize_handle(
-        str(
-            item.get("handle")
-            or ""
-        )
-    )
+    api_handle = _normalize_handle(str(item.get("handle") or ""))
 
     if api_handle:
         return api_handle
@@ -288,9 +247,7 @@ def _select_item_handle(
     )
 
     for identifier in identifier_values:
-        handle = _normalize_handle(
-            identifier
-        )
+        handle = _normalize_handle(identifier)
 
         if handle:
             return handle
@@ -302,27 +259,15 @@ def _landing_url(
     source: SourceConfig,
     item: dict[str, Any],
 ) -> str | None:
-    handle = _select_item_handle(
-        item
-    )
+    handle = _select_item_handle(item)
 
     if handle:
-        return (
-            f"{source.base_url.rstrip('/')}"
-            f"/handle/{handle}"
-        )
+        return f"{source.base_url.rstrip('/')}/handle/{handle}"
 
-    uuid = str(
-        item.get("uuid")
-        or item.get("id")
-        or ""
-    ).strip()
+    uuid = str(item.get("uuid") or item.get("id") or "").strip()
 
     if uuid:
-        return (
-            f"{source.base_url.rstrip('/')}"
-            f"/items/{uuid}"
-        )
+        return f"{source.base_url.rstrip('/')}/items/{uuid}"
 
     return None
 
@@ -331,28 +276,19 @@ def _publication_from_item(
     source: SourceConfig,
     item: dict[str, Any],
 ) -> Publication | None:
-    uuid = str(
-        item.get("uuid")
-        or item.get("id")
-        or ""
-    ).strip()
+    uuid = str(item.get("uuid") or item.get("id") or "").strip()
 
     if not uuid:
         return None
 
-    handle = _select_item_handle(
-        item
-    )
+    handle = _select_item_handle(item)
 
     title = (
         _first_metadata_value(
             item,
             "dc.title",
         )
-        or str(
-            item.get("name")
-            or ""
-        ).strip()
+        or str(item.get("name") or "").strip()
         or None
     )
 
@@ -377,9 +313,7 @@ def _publication_from_item(
     )
 
     if landing_url:
-        identifiers.append(
-            landing_url
-        )
+        identifiers.append(landing_url)
 
     external_id = f"wku:{handle}" if handle else f"wku:{uuid}"
 
@@ -389,9 +323,7 @@ def _publication_from_item(
         title=title,
         landing_url=landing_url,
         item_uuid=uuid,
-        identifiers=unique(
-            identifiers
-        ),
+        identifiers=unique(identifiers),
         authors=authors,
         issued_date=issued_date,
         raw=item,
@@ -420,26 +352,19 @@ def iter_wku_rest_publications(
                 "size": page_size,
             },
             headers={
-                "Accept": (
-                    "application/hal+json,"
-                    "application/json"
-                ),
+                "Accept": ("application/hal+json,application/json"),
             },
         )
 
-        items = _extract_search_items(
-            payload
-        )
+        items = _extract_search_items(payload)
 
         if not items:
             return
 
         for item in items:
-            publication = (
-                _publication_from_item(
-                    source,
-                    item,
-                )
+            publication = _publication_from_item(
+                source,
+                item,
             )
 
             if publication is None:
@@ -449,17 +374,10 @@ def iter_wku_rest_publications(
 
             yielded += 1
 
-            if (
-                max_records is not None
-                and yielded >= max_records
-            ):
+            if max_records is not None and yielded >= max_records:
                 return
 
-        search_result = (
-            _extract_search_result(
-                payload
-            )
-        )
+        search_result = _extract_search_result(payload)
 
         page_info = search_result.get(
             "page",
@@ -469,9 +387,7 @@ def iter_wku_rest_publications(
         if not isinstance(page_info, dict):
             page_info = {}
 
-        total_pages = page_info.get(
-            "totalPages"
-        )
+        total_pages = page_info.get("totalPages")
 
         current_page = page_info.get(
             "number",
@@ -491,9 +407,7 @@ def iter_wku_rest_publications(
             if not isinstance(links, dict):
                 return
 
-            next_link = links.get(
-                "next"
-            )
+            next_link = links.get("next")
 
             if not next_link:
                 return
@@ -517,10 +431,7 @@ def iter_wku_oai_publications(
         name=source.name,
         kind="wku_oai",
         base_url=source.base_url,
-        endpoint=(
-            f"{source.base_url.rstrip('/')}"
-            "/server/oai/request"
-        ),
+        endpoint=(f"{source.base_url.rstrip('/')}/server/oai/request"),
         metadata_prefix="oai_dc",
     )
 
@@ -534,23 +445,14 @@ def iter_wku_oai_publications(
         normalized_identifiers: list[str] = []
 
         for identifier in publication.identifiers:
-            handle = _normalize_handle(
-                identifier
-            )
+            handle = _normalize_handle(identifier)
 
             if handle:
-                normalized_identifiers.append(
-                    f"{source.base_url.rstrip('/')}"
-                    f"/handle/{handle}"
-                )
+                normalized_identifiers.append(f"{source.base_url.rstrip('/')}/handle/{handle}")
             else:
-                normalized_identifiers.append(
-                    identifier
-                )
+                normalized_identifiers.append(identifier)
 
-        publication.identifiers = unique(
-            normalized_identifiers
-        )
+        publication.identifiers = unique(normalized_identifiers)
 
         yield publication
 
@@ -571,13 +473,11 @@ def iter_wku_publications(
     yielded = 0
 
     try:
-        for publication in (
-            iter_wku_rest_publications(
-                client,
-                source,
-                max_records=max_records,
-                page_size=page_size,
-            )
+        for publication in iter_wku_rest_publications(
+            client,
+            source,
+            max_records=max_records,
+            page_size=page_size,
         ):
             yield publication
             yielded += 1
@@ -586,8 +486,7 @@ def iter_wku_publications(
 
     except Exception as exc:
         LOGGER.warning(
-            "WKU REST enumeration failed: %s. "
-            "Falling back to OAI-PMH.",
+            "WKU REST enumeration failed: %s. Falling back to OAI-PMH.",
             exc,
         )
 
@@ -630,27 +529,17 @@ def _bundle_bitstreams_url(
             bitstreams_link,
             dict,
         ):
-            href = bitstreams_link.get(
-                "href"
-            )
+            href = bitstreams_link.get("href")
 
             if href:
                 return str(href)
 
-    bundle_uuid = str(
-        bundle.get("uuid")
-        or bundle.get("id")
-        or ""
-    ).strip()
+    bundle_uuid = str(bundle.get("uuid") or bundle.get("id") or "").strip()
 
     if not bundle_uuid:
         return None
 
-    return (
-        f"{_api_base(source)}"
-        f"/core/bundles/{bundle_uuid}"
-        "/bitstreams"
-    )
+    return f"{_api_base(source)}/core/bundles/{bundle_uuid}/bitstreams"
 
 
 def _bitstream_content_url(
@@ -672,36 +561,23 @@ def _bitstream_content_url(
             content_link,
             dict,
         ):
-            href = content_link.get(
-                "href"
-            )
+            href = content_link.get("href")
 
             if href:
                 return str(href)
 
-    uuid = str(
-        bitstream.get("uuid")
-        or bitstream.get("id")
-        or ""
-    ).strip()
+    uuid = str(bitstream.get("uuid") or bitstream.get("id") or "").strip()
 
     if not uuid:
         return None
 
-    return (
-        f"{_api_base(source)}"
-        f"/core/bitstreams/{uuid}"
-        "/content"
-    )
+    return f"{_api_base(source)}/core/bitstreams/{uuid}/content"
 
 
 def _bitstream_filename(
     bitstream: dict[str, Any],
 ) -> str | None:
-    name = str(
-        bitstream.get("name")
-        or ""
-    ).strip()
+    name = str(bitstream.get("name") or "").strip()
 
     return name or None
 
@@ -709,22 +585,14 @@ def _bitstream_filename(
 def _bitstream_extension(
     bitstream: dict[str, Any],
 ) -> str:
-    filename = _bitstream_filename(
-        bitstream
-    )
+    filename = _bitstream_filename(bitstream)
 
     if not filename:
         return ""
 
-    decoded_name = unquote(
-        filename
-    )
+    decoded_name = unquote(filename)
 
-    return (
-        PurePosixPath(decoded_name)
-        .suffix
-        .lower()
-    )
+    return PurePosixPath(decoded_name).suffix.lower()
 
 
 def _metadata_mime_type(
@@ -754,12 +622,7 @@ def _metadata_mime_type(
             if not isinstance(entry, dict):
                 continue
 
-            value = _normalize_content_type(
-                str(
-                    entry.get("value")
-                    or ""
-                )
-            )
+            value = _normalize_content_type(str(entry.get("value") or ""))
 
             if value:
                 return value
@@ -770,16 +633,12 @@ def _metadata_mime_type(
 def _bitstream_mime_type(
     bitstream: dict[str, Any],
 ) -> str | None:
-    mime_type = _metadata_mime_type(
-        bitstream
-    )
+    mime_type = _metadata_mime_type(bitstream)
 
     if mime_type:
         return mime_type
 
-    extension = _bitstream_extension(
-        bitstream
-    )
+    extension = _bitstream_extension(bitstream)
 
     if extension == ".pdf":
         return "application/pdf"
@@ -788,10 +647,7 @@ def _bitstream_mime_type(
         return "application/msword"
 
     if extension == ".docx":
-        return (
-            "application/vnd.openxmlformats-officedocument."
-            "wordprocessingml.document"
-        )
+        return "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
 
     return None
 
@@ -799,33 +655,20 @@ def _bitstream_mime_type(
 def _is_supported_bitstream(
     bitstream: dict[str, Any],
 ) -> bool:
-    extension = _bitstream_extension(
-        bitstream
-    )
+    extension = _bitstream_extension(bitstream)
 
-    if (
-        extension
-        in SUPPORTED_DOCUMENT_EXTENSIONS
-    ):
+    if extension in SUPPORTED_DOCUMENT_EXTENSIONS:
         return True
 
-    mime_type = _bitstream_mime_type(
-        bitstream
-    )
+    mime_type = _bitstream_mime_type(bitstream)
 
-    return (
-        mime_type
-        in SUPPORTED_DOCUMENT_MIME_TYPES
-    )
+    return mime_type in SUPPORTED_DOCUMENT_MIME_TYPES
 
 
 def _is_original_bundle(
     bundle: dict[str, Any],
 ) -> bool:
-    name = str(
-        bundle.get("name")
-        or ""
-    ).strip().upper()
+    name = str(bundle.get("name") or "").strip().upper()
 
     return name == "ORIGINAL"
 
@@ -843,11 +686,7 @@ def discover_wku_documents_by_uuid(
     -> bitstreams
     -> content endpoint
     """
-    bundles_url = (
-        f"{_api_base(source)}"
-        f"/core/items/{item_uuid}"
-        "/bundles"
-    )
+    bundles_url = f"{_api_base(source)}/core/items/{item_uuid}/bundles"
 
     bundles_payload = client.get_json(
         bundles_url,
@@ -855,10 +694,7 @@ def discover_wku_documents_by_uuid(
             "size": 100,
         },
         headers={
-            "Accept": (
-                "application/hal+json,"
-                "application/json"
-            ),
+            "Accept": ("application/hal+json,application/json"),
         },
     )
 
@@ -871,69 +707,47 @@ def discover_wku_documents_by_uuid(
     )
 
     for bundle in bundles:
-        if not _is_original_bundle(
-            bundle
-        ):
+        if not _is_original_bundle(bundle):
             continue
 
-        bitstreams_url = (
-            _bundle_bitstreams_url(
-                source,
-                bundle,
-            )
+        bitstreams_url = _bundle_bitstreams_url(
+            source,
+            bundle,
         )
 
         if not bitstreams_url:
             continue
 
-        bitstreams_payload = (
-            client.get_json(
-                bitstreams_url,
-                params={
-                    "size": 100,
-                },
-                headers={
-                    "Accept": (
-                        "application/hal+json,"
-                        "application/json"
-                    ),
-                },
-            )
+        bitstreams_payload = client.get_json(
+            bitstreams_url,
+            params={
+                "size": 100,
+            },
+            headers={
+                "Accept": ("application/hal+json,application/json"),
+            },
         )
 
-        bitstreams = (
-            _extract_embedded_list(
-                bitstreams_payload,
-                "bitstreams",
-            )
+        bitstreams = _extract_embedded_list(
+            bitstreams_payload,
+            "bitstreams",
         )
 
         for bitstream in bitstreams:
-            if not _is_supported_bitstream(
-                bitstream
-            ):
+            if not _is_supported_bitstream(bitstream):
                 continue
 
-            content_url = (
-                _bitstream_content_url(
-                    source,
-                    bitstream,
-                )
+            content_url = _bitstream_content_url(
+                source,
+                bitstream,
             )
 
-            if (
-                not content_url
-                or content_url in seen_urls
-            ):
+            if not content_url or content_url in seen_urls:
                 continue
 
-            seen_urls.add(
-                content_url
-            )
+            seen_urls.add(content_url)
 
-            size_bytes = bitstream.get(
-                "sizeBytes"
-            )
+            size_bytes = bitstream.get("sizeBytes")
 
             if not isinstance(
                 size_bytes,
@@ -944,16 +758,8 @@ def discover_wku_documents_by_uuid(
             candidates.append(
                 DocumentCandidate(
                     url=content_url,
-                    filename=(
-                        _bitstream_filename(
-                            bitstream
-                        )
-                    ),
-                    mime_type=(
-                        _bitstream_mime_type(
-                            bitstream
-                        )
-                    ),
+                    filename=(_bitstream_filename(bitstream)),
+                    mime_type=(_bitstream_mime_type(bitstream)),
                     size_bytes=size_bytes,
                 )
             )
@@ -971,9 +777,7 @@ def _extract_publication_handle(
     ]
 
     for value in candidates:
-        handle = _normalize_handle(
-            value
-        )
+        handle = _normalize_handle(value)
 
         if handle:
             return handle
@@ -992,17 +796,11 @@ def _resolve_uuid_by_handle(
             "id": handle,
         },
         headers={
-            "Accept": (
-                "application/hal+json,"
-                "application/json"
-            ),
+            "Accept": ("application/hal+json,application/json"),
         },
     )
 
-    uuid = (
-        payload.get("uuid")
-        or payload.get("id")
-    )
+    uuid = payload.get("uuid") or payload.get("id")
 
     if uuid:
         return str(uuid)
@@ -1018,17 +816,12 @@ def _resolve_uuid_by_handle(
             "indexableObject",
             "dspaceObject",
         ):
-            item = embedded.get(
-                key
-            )
+            item = embedded.get(key)
 
             if not isinstance(item, dict):
                 continue
 
-            uuid = (
-                item.get("uuid")
-                or item.get("id")
-            )
+            uuid = item.get("uuid") or item.get("id")
 
             if uuid:
                 return str(uuid)
@@ -1044,9 +837,7 @@ def _resolve_publication_uuid(
     if publication.item_uuid:
         return publication.item_uuid
 
-    handle = _extract_publication_handle(
-        publication
-    )
+    handle = _extract_publication_handle(publication)
 
     if not handle:
         return None
@@ -1091,12 +882,10 @@ def discover_wku_documents(
 
     if item_uuid:
         try:
-            candidates = (
-                discover_wku_documents_by_uuid(
-                    client,
-                    source,
-                    item_uuid,
-                )
+            candidates = discover_wku_documents_by_uuid(
+                client,
+                source,
+                item_uuid,
             )
 
             if candidates:
@@ -1104,8 +893,7 @@ def discover_wku_documents(
 
         except Exception as exc:
             LOGGER.warning(
-                "WKU REST document discovery failed "
-                "for %s: %s",
+                "WKU REST document discovery failed for %s: %s",
                 publication.external_id,
                 exc,
             )
@@ -1113,19 +901,12 @@ def discover_wku_documents(
     landing_url = publication.landing_url
 
     if not landing_url:
-        handle = _extract_publication_handle(
-            publication
-        )
+        handle = _extract_publication_handle(publication)
 
         if handle:
-            landing_url = (
-                f"{source.base_url.rstrip('/')}"
-                f"/handle/{handle}"
-            )
+            landing_url = f"{source.base_url.rstrip('/')}/handle/{handle}"
 
-            publication.landing_url = (
-                landing_url
-            )
+            publication.landing_url = landing_url
 
     if not landing_url:
         return []

@@ -176,4 +176,3 @@ def split_terms(values: list[str]) -> list[str]:
                 seen.add(term.casefold())
                 terms.append(term)
     return terms
-

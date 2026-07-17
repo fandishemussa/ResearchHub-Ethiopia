@@ -104,11 +104,13 @@ async def get_source(
 
 
 @router.patch(
-    "/{source_id}", response_model=SourceRead,
+    "/{source_id}",
+    response_model=SourceRead,
     dependencies=[Depends(require_permission(Permissions.SOURCES_MANAGE))],
 )
 @router.put(
-    "/{source_id}", response_model=SourceRead,
+    "/{source_id}",
+    response_model=SourceRead,
     dependencies=[Depends(require_permission(Permissions.SOURCES_MANAGE))],
 )
 async def update_source(
@@ -128,7 +130,8 @@ async def update_source(
 
 
 @router.delete(
-    "/{source_id}", status_code=status.HTTP_204_NO_CONTENT,
+    "/{source_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
     dependencies=[Depends(require_permission(Permissions.SOURCES_MANAGE))],
 )
 async def delete_source(
@@ -143,7 +146,8 @@ async def delete_source(
 
 
 @router.post(
-    "/{source_id}/enable", response_model=SourceRead,
+    "/{source_id}/enable",
+    response_model=SourceRead,
     dependencies=[Depends(require_permission(Permissions.SOURCES_MANAGE))],
 )
 async def enable_source(
@@ -156,7 +160,8 @@ async def enable_source(
 
 
 @router.post(
-    "/{source_id}/disable", response_model=SourceRead,
+    "/{source_id}/disable",
+    response_model=SourceRead,
     dependencies=[Depends(require_permission(Permissions.SOURCES_MANAGE))],
 )
 async def disable_source(
@@ -169,7 +174,8 @@ async def disable_source(
 
 
 @router.post(
-    "/{source_id}/test", response_model=SourceConnectionTestResult,
+    "/{source_id}/test",
+    response_model=SourceConnectionTestResult,
     dependencies=[Depends(require_permission(Permissions.SOURCES_MANAGE))],
 )
 async def test_source(
@@ -228,7 +234,8 @@ async def _queue_harvest(
 
 
 @router.post(
-    "/{source_id}/harvest", response_model=HarvestJobDetail,
+    "/{source_id}/harvest",
+    response_model=HarvestJobDetail,
     status_code=status.HTTP_202_ACCEPTED,
     dependencies=[Depends(require_permission(Permissions.HARVEST_START))],
 )
@@ -299,7 +306,8 @@ async def _source_upload(
 
 
 @router.post(
-    "/{source_id}/import/xml", response_model=HarvestJobDetail,
+    "/{source_id}/import/xml",
+    response_model=HarvestJobDetail,
     status_code=status.HTTP_201_CREATED,
     dependencies=[Depends(require_permission(Permissions.IMPORTS_CREATE))],
 )
@@ -312,7 +320,8 @@ async def source_import_xml(
 
 
 @router.post(
-    "/{source_id}/import/json", response_model=HarvestJobDetail,
+    "/{source_id}/import/json",
+    response_model=HarvestJobDetail,
     status_code=status.HTTP_201_CREATED,
     dependencies=[Depends(require_permission(Permissions.IMPORTS_CREATE))],
 )
@@ -325,7 +334,8 @@ async def source_import_json(
 
 
 @router.post(
-    "/{source_id}/import/csv", response_model=HarvestJobDetail,
+    "/{source_id}/import/csv",
+    response_model=HarvestJobDetail,
     status_code=status.HTTP_201_CREATED,
     dependencies=[Depends(require_permission(Permissions.IMPORTS_CREATE))],
 )

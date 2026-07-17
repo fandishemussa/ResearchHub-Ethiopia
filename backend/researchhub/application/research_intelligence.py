@@ -16,6 +16,7 @@ from researchhub_ai.text_builder import PublicationTextBuilder
 from sqlalchemy import func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
+from sqlalchemy.sql.elements import ColumnElement
 
 from researchhub.application.full_text_summary import summarize_document_chunks
 from researchhub.application.publication_documents import PublicationDocumentResolver
@@ -543,7 +544,9 @@ class ResearchIntelligenceService:
     ) -> list[DuplicateCandidate]:
         target = await self.publication(publication_id)
         title_prefix = " ".join((target.normalized_title or target.title).split()[:4])
-        filters = [Publication.normalized_title.ilike(f"%{title_prefix}%")]
+        filters: list[ColumnElement[bool]] = [
+            Publication.normalized_title.ilike(f"%{title_prefix}%")
+        ]
         if target.doi:
             filters.append(func.lower(Publication.doi) == target.doi.casefold())
         statement = (

@@ -6,6 +6,7 @@ Create Date: 2026-07-11
 """
 
 from collections.abc import Iterable
+from typing import Any
 
 import sqlalchemy as sa
 from alembic import op
@@ -17,7 +18,7 @@ branch_labels = None
 depends_on = None
 
 
-def uuid_column() -> sa.Column:
+def uuid_column() -> sa.Column[Any]:
     """Create a PostgreSQL UUID primary key column with database-side defaults."""
 
     return sa.Column(
@@ -28,12 +29,22 @@ def uuid_column() -> sa.Column:
     )
 
 
-def timestamps() -> Iterable[sa.Column]:
+def timestamps() -> Iterable[sa.Column[Any]]:
     """Shared timestamp columns for mutable tables."""
 
     return (
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
-        sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False,
+        ),
+        sa.Column(
+            "updated_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False,
+        ),
     )
 
 
@@ -54,7 +65,9 @@ def upgrade() -> None:
         sa.Column("city", sa.String(120)),
         sa.Column("website_url", sa.String(500)),
         sa.Column("is_active", sa.Boolean(), nullable=False, server_default=sa.text("true")),
-        sa.Column("metadata", postgresql.JSONB(), nullable=False, server_default=sa.text("'{}'::jsonb")),
+        sa.Column(
+            "metadata", postgresql.JSONB(), nullable=False, server_default=sa.text("'{}'::jsonb")
+        ),
         *timestamps(),
         sa.UniqueConstraint("code"),
         sa.UniqueConstraint("name"),
@@ -66,7 +79,12 @@ def upgrade() -> None:
     op.create_table(
         "faculties",
         uuid_column(),
-        sa.Column("university_id", postgresql.UUID(as_uuid=True), sa.ForeignKey("universities.id"), nullable=False),
+        sa.Column(
+            "university_id",
+            postgresql.UUID(as_uuid=True),
+            sa.ForeignKey("universities.id"),
+            nullable=False,
+        ),
         sa.Column("name", sa.String(255), nullable=False),
         sa.Column("code", sa.String(60)),
         *timestamps(),
@@ -78,7 +96,12 @@ def upgrade() -> None:
     op.create_table(
         "departments",
         uuid_column(),
-        sa.Column("university_id", postgresql.UUID(as_uuid=True), sa.ForeignKey("universities.id"), nullable=False),
+        sa.Column(
+            "university_id",
+            postgresql.UUID(as_uuid=True),
+            sa.ForeignKey("universities.id"),
+            nullable=False,
+        ),
         sa.Column("faculty_id", postgresql.UUID(as_uuid=True), sa.ForeignKey("faculties.id")),
         sa.Column("name", sa.String(255), nullable=False),
         sa.Column("code", sa.String(60)),
@@ -92,15 +115,27 @@ def upgrade() -> None:
     op.create_table(
         "repositories",
         uuid_column(),
-        sa.Column("university_id", postgresql.UUID(as_uuid=True), sa.ForeignKey("universities.id"), nullable=False),
+        sa.Column(
+            "university_id",
+            postgresql.UUID(as_uuid=True),
+            sa.ForeignKey("universities.id"),
+            nullable=False,
+        ),
         sa.Column("name", sa.String(255), nullable=False),
         sa.Column("platform", sa.String(80), nullable=False),
         sa.Column("base_url", sa.String(500), nullable=False),
         sa.Column("oai_endpoint", sa.String(500)),
-        sa.Column("metadata_formats", postgresql.JSONB(), nullable=False, server_default=sa.text("'[]'::jsonb")),
+        sa.Column(
+            "metadata_formats",
+            postgresql.JSONB(),
+            nullable=False,
+            server_default=sa.text("'[]'::jsonb"),
+        ),
         sa.Column("is_active", sa.Boolean(), nullable=False, server_default=sa.text("true")),
         sa.Column("last_harvested_at", sa.DateTime(timezone=True)),
-        sa.Column("metadata", postgresql.JSONB(), nullable=False, server_default=sa.text("'{}'::jsonb")),
+        sa.Column(
+            "metadata", postgresql.JSONB(), nullable=False, server_default=sa.text("'{}'::jsonb")
+        ),
         *timestamps(),
         sa.UniqueConstraint("university_id", "name"),
     )
@@ -136,7 +171,9 @@ def upgrade() -> None:
         sa.Column("affiliation", sa.String(500)),
         sa.Column("university_id", postgresql.UUID(as_uuid=True), sa.ForeignKey("universities.id")),
         sa.Column("department_id", postgresql.UUID(as_uuid=True), sa.ForeignKey("departments.id")),
-        sa.Column("metadata", postgresql.JSONB(), nullable=False, server_default=sa.text("'{}'::jsonb")),
+        sa.Column(
+            "metadata", postgresql.JSONB(), nullable=False, server_default=sa.text("'{}'::jsonb")
+        ),
         *timestamps(),
         sa.UniqueConstraint("orcid"),
     )
@@ -155,7 +192,9 @@ def upgrade() -> None:
         sa.Column("country", sa.String(80)),
         sa.Column("ror_id", sa.String(80)),
         sa.Column("url", sa.String(500)),
-        sa.Column("metadata", postgresql.JSONB(), nullable=False, server_default=sa.text("'{}'::jsonb")),
+        sa.Column(
+            "metadata", postgresql.JSONB(), nullable=False, server_default=sa.text("'{}'::jsonb")
+        ),
         *timestamps(),
         sa.UniqueConstraint("ror_id"),
     )
@@ -170,12 +209,19 @@ def upgrade() -> None:
         sa.Column("external_id", sa.String(500)),
         sa.Column("title", sa.Text(), nullable=False),
         sa.Column("abstract", sa.Text()),
-        sa.Column("affiliations", postgresql.JSONB(), nullable=False, server_default=sa.text("'[]'::jsonb")),
+        sa.Column(
+            "affiliations",
+            postgresql.JSONB(),
+            nullable=False,
+            server_default=sa.text("'[]'::jsonb"),
+        ),
         sa.Column("journal_id", postgresql.UUID(as_uuid=True), sa.ForeignKey("journals.id")),
         sa.Column("publisher", sa.String(255)),
         sa.Column("publication_date", sa.Date()),
         sa.Column("publication_year", sa.Integer()),
-        sa.Column("subjects", postgresql.JSONB(), nullable=False, server_default=sa.text("'[]'::jsonb")),
+        sa.Column(
+            "subjects", postgresql.JSONB(), nullable=False, server_default=sa.text("'[]'::jsonb")
+        ),
         sa.Column("language", sa.String(20)),
         sa.Column("doi", sa.String(255)),
         sa.Column("issn", sa.String(20)),
@@ -190,8 +236,12 @@ def upgrade() -> None:
         sa.Column("harvested_at", sa.DateTime(timezone=True)),
         sa.Column("quality_score", sa.Numeric(5, 2)),
         sa.Column("is_deleted", sa.Boolean(), nullable=False, server_default=sa.text("false")),
-        sa.Column("raw_record", postgresql.JSONB(), nullable=False, server_default=sa.text("'{}'::jsonb")),
-        sa.Column("metadata", postgresql.JSONB(), nullable=False, server_default=sa.text("'{}'::jsonb")),
+        sa.Column(
+            "raw_record", postgresql.JSONB(), nullable=False, server_default=sa.text("'{}'::jsonb")
+        ),
+        sa.Column(
+            "metadata", postgresql.JSONB(), nullable=False, server_default=sa.text("'{}'::jsonb")
+        ),
         sa.Column("search_vector", postgresql.TSVECTOR()),
         *timestamps(),
         sa.UniqueConstraint("source", "external_id"),
@@ -245,15 +295,24 @@ def upgrade() -> None:
     op.create_table(
         "publication_authors",
         uuid_column(),
-        sa.Column("publication_id", postgresql.UUID(as_uuid=True), sa.ForeignKey("publications.id"), nullable=False),
-        sa.Column("author_id", postgresql.UUID(as_uuid=True), sa.ForeignKey("authors.id"), nullable=False),
+        sa.Column(
+            "publication_id",
+            postgresql.UUID(as_uuid=True),
+            sa.ForeignKey("publications.id"),
+            nullable=False,
+        ),
+        sa.Column(
+            "author_id", postgresql.UUID(as_uuid=True), sa.ForeignKey("authors.id"), nullable=False
+        ),
         sa.Column("author_order", sa.Integer(), nullable=False, server_default="1"),
         sa.Column("affiliation", sa.String(500)),
         sa.Column("orcid", sa.String(19)),
         *timestamps(),
         sa.UniqueConstraint("publication_id", "author_id"),
     )
-    op.create_index("ix_publication_authors_publication_id", "publication_authors", ["publication_id"])
+    op.create_index(
+        "ix_publication_authors_publication_id", "publication_authors", ["publication_id"]
+    )
     op.create_index("ix_publication_authors_author_id", "publication_authors", ["author_id"])
     op.create_index("ix_publication_authors_orcid", "publication_authors", ["orcid"])
 
@@ -272,25 +331,41 @@ def upgrade() -> None:
     op.create_table(
         "publication_keywords",
         uuid_column(),
-        sa.Column("publication_id", postgresql.UUID(as_uuid=True), sa.ForeignKey("publications.id"), nullable=False),
-        sa.Column("keyword_id", postgresql.UUID(as_uuid=True), sa.ForeignKey("keywords.id"), nullable=False),
+        sa.Column(
+            "publication_id",
+            postgresql.UUID(as_uuid=True),
+            sa.ForeignKey("publications.id"),
+            nullable=False,
+        ),
+        sa.Column(
+            "keyword_id",
+            postgresql.UUID(as_uuid=True),
+            sa.ForeignKey("keywords.id"),
+            nullable=False,
+        ),
         sa.Column("relevance_score", sa.Numeric(5, 4)),
         *timestamps(),
         sa.UniqueConstraint("publication_id", "keyword_id"),
     )
-    op.create_index("ix_publication_keywords_publication_id", "publication_keywords", ["publication_id"])
+    op.create_index(
+        "ix_publication_keywords_publication_id", "publication_keywords", ["publication_id"]
+    )
     op.create_index("ix_publication_keywords_keyword_id", "publication_keywords", ["keyword_id"])
 
     op.create_table(
         "datasets",
         uuid_column(),
-        sa.Column("publication_id", postgresql.UUID(as_uuid=True), sa.ForeignKey("publications.id")),
+        sa.Column(
+            "publication_id", postgresql.UUID(as_uuid=True), sa.ForeignKey("publications.id")
+        ),
         sa.Column("title", sa.String(500), nullable=False),
         sa.Column("doi", sa.String(255)),
         sa.Column("url", sa.String(1000)),
         sa.Column("repository", sa.String(255)),
         sa.Column("license", sa.String(255)),
-        sa.Column("metadata", postgresql.JSONB(), nullable=False, server_default=sa.text("'{}'::jsonb")),
+        sa.Column(
+            "metadata", postgresql.JSONB(), nullable=False, server_default=sa.text("'{}'::jsonb")
+        ),
         *timestamps(),
         sa.UniqueConstraint("doi"),
     )
@@ -306,9 +381,15 @@ def upgrade() -> None:
         sa.Column("start_date", sa.Date()),
         sa.Column("end_date", sa.Date()),
         sa.Column("funder_id", postgresql.UUID(as_uuid=True), sa.ForeignKey("organizations.id")),
-        sa.Column("principal_investigator_author_id", postgresql.UUID(as_uuid=True), sa.ForeignKey("authors.id")),
+        sa.Column(
+            "principal_investigator_author_id",
+            postgresql.UUID(as_uuid=True),
+            sa.ForeignKey("authors.id"),
+        ),
         sa.Column("status", sa.String(80)),
-        sa.Column("metadata", postgresql.JSONB(), nullable=False, server_default=sa.text("'{}'::jsonb")),
+        sa.Column(
+            "metadata", postgresql.JSONB(), nullable=False, server_default=sa.text("'{}'::jsonb")
+        ),
         *timestamps(),
     )
     op.create_index("ix_research_projects_university_id", "research_projects", ["university_id"])
@@ -324,13 +405,25 @@ def upgrade() -> None:
     op.create_table(
         "citations",
         uuid_column(),
-        sa.Column("publication_id", postgresql.UUID(as_uuid=True), sa.ForeignKey("publications.id"), nullable=False),
+        sa.Column(
+            "publication_id",
+            postgresql.UUID(as_uuid=True),
+            sa.ForeignKey("publications.id"),
+            nullable=False,
+        ),
         sa.Column("citing_doi", sa.String(255)),
         sa.Column("citing_title", sa.Text()),
         sa.Column("citing_source", sa.String(120)),
         sa.Column("citation_count", sa.Integer(), nullable=False, server_default="0"),
-        sa.Column("observed_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
-        sa.Column("metadata", postgresql.JSONB(), nullable=False, server_default=sa.text("'{}'::jsonb")),
+        sa.Column(
+            "observed_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False,
+        ),
+        sa.Column(
+            "metadata", postgresql.JSONB(), nullable=False, server_default=sa.text("'{}'::jsonb")
+        ),
         *timestamps(),
     )
     op.create_index("ix_citations_publication_id", "citations", ["publication_id"])
@@ -347,7 +440,9 @@ def upgrade() -> None:
         sa.Column("base_url", sa.String(500)),
         sa.Column("university_id", postgresql.UUID(as_uuid=True), sa.ForeignKey("universities.id")),
         sa.Column("repository_id", postgresql.UUID(as_uuid=True), sa.ForeignKey("repositories.id")),
-        sa.Column("config", postgresql.JSONB(), nullable=False, server_default=sa.text("'{}'::jsonb")),
+        sa.Column(
+            "config", postgresql.JSONB(), nullable=False, server_default=sa.text("'{}'::jsonb")
+        ),
         sa.Column("enabled", sa.Boolean(), nullable=False, server_default=sa.text("true")),
         sa.Column("schedule", sa.String(120)),
         sa.Column("last_cursor", sa.Text()),
@@ -364,7 +459,12 @@ def upgrade() -> None:
     op.create_table(
         "harvest_jobs",
         uuid_column(),
-        sa.Column("connector_id", postgresql.UUID(as_uuid=True), sa.ForeignKey("connectors.id"), nullable=False),
+        sa.Column(
+            "connector_id",
+            postgresql.UUID(as_uuid=True),
+            sa.ForeignKey("connectors.id"),
+            nullable=False,
+        ),
         sa.Column("status", sa.String(40), nullable=False, server_default="queued"),
         sa.Column("started_at", sa.DateTime(timezone=True)),
         sa.Column("finished_at", sa.DateTime(timezone=True)),
@@ -377,7 +477,9 @@ def upgrade() -> None:
         sa.Column("error_count", sa.Integer(), nullable=False, server_default="0"),
         sa.Column("cursor", sa.Text()),
         sa.Column("error_message", sa.Text()),
-        sa.Column("metadata", postgresql.JSONB(), nullable=False, server_default=sa.text("'{}'::jsonb")),
+        sa.Column(
+            "metadata", postgresql.JSONB(), nullable=False, server_default=sa.text("'{}'::jsonb")
+        ),
         *timestamps(),
     )
     op.create_index("ix_harvest_jobs_connector_id", "harvest_jobs", ["connector_id"])
@@ -388,12 +490,24 @@ def upgrade() -> None:
     op.create_table(
         "harvest_logs",
         uuid_column(),
-        sa.Column("harvest_job_id", postgresql.UUID(as_uuid=True), sa.ForeignKey("harvest_jobs.id"), nullable=False),
+        sa.Column(
+            "harvest_job_id",
+            postgresql.UUID(as_uuid=True),
+            sa.ForeignKey("harvest_jobs.id"),
+            nullable=False,
+        ),
         sa.Column("level", sa.String(20), nullable=False),
         sa.Column("event", sa.String(120), nullable=False),
         sa.Column("message", sa.Text(), nullable=False),
-        sa.Column("context", postgresql.JSONB(), nullable=False, server_default=sa.text("'{}'::jsonb")),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
+        sa.Column(
+            "context", postgresql.JSONB(), nullable=False, server_default=sa.text("'{}'::jsonb")
+        ),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False,
+        ),
     )
     op.create_index("ix_harvest_logs_harvest_job_id", "harvest_logs", ["harvest_job_id"])
     op.create_index("ix_harvest_logs_level", "harvest_logs", ["level"])
@@ -403,12 +517,22 @@ def upgrade() -> None:
     op.create_table(
         "metadata_history",
         uuid_column(),
-        sa.Column("publication_id", postgresql.UUID(as_uuid=True), sa.ForeignKey("publications.id"), nullable=False),
+        sa.Column(
+            "publication_id",
+            postgresql.UUID(as_uuid=True),
+            sa.ForeignKey("publications.id"),
+            nullable=False,
+        ),
         sa.Column("source", sa.String(120), nullable=False),
         sa.Column("field_name", sa.String(120), nullable=False),
         sa.Column("old_value", postgresql.JSONB()),
         sa.Column("new_value", postgresql.JSONB()),
-        sa.Column("changed_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
+        sa.Column(
+            "changed_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False,
+        ),
         sa.Column("changed_by", sa.String(120)),
     )
     op.create_index("ix_metadata_history_publication_id", "metadata_history", ["publication_id"])
@@ -419,12 +543,31 @@ def upgrade() -> None:
     op.create_table(
         "quality_reports",
         uuid_column(),
-        sa.Column("publication_id", postgresql.UUID(as_uuid=True), sa.ForeignKey("publications.id"), nullable=False),
+        sa.Column(
+            "publication_id",
+            postgresql.UUID(as_uuid=True),
+            sa.ForeignKey("publications.id"),
+            nullable=False,
+        ),
         sa.Column("score", sa.Numeric(5, 2), nullable=False),
-        sa.Column("missing_fields", postgresql.JSONB(), nullable=False, server_default=sa.text("'[]'::jsonb")),
-        sa.Column("warnings", postgresql.JSONB(), nullable=False, server_default=sa.text("'[]'::jsonb")),
-        sa.Column("generated_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
-        sa.Column("metadata", postgresql.JSONB(), nullable=False, server_default=sa.text("'{}'::jsonb")),
+        sa.Column(
+            "missing_fields",
+            postgresql.JSONB(),
+            nullable=False,
+            server_default=sa.text("'[]'::jsonb"),
+        ),
+        sa.Column(
+            "warnings", postgresql.JSONB(), nullable=False, server_default=sa.text("'[]'::jsonb")
+        ),
+        sa.Column(
+            "generated_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False,
+        ),
+        sa.Column(
+            "metadata", postgresql.JSONB(), nullable=False, server_default=sa.text("'{}'::jsonb")
+        ),
     )
     op.create_index("ix_quality_reports_publication_id", "quality_reports", ["publication_id"])
     op.create_index("ix_quality_reports_generated_at", "quality_reports", ["generated_at"])
@@ -469,7 +612,9 @@ def downgrade() -> None:
     op.drop_table("citations")
 
     op.drop_index("ix_research_projects_status", table_name="research_projects")
-    op.drop_index("ix_research_projects_principal_investigator_author_id", table_name="research_projects")
+    op.drop_index(
+        "ix_research_projects_principal_investigator_author_id", table_name="research_projects"
+    )
     op.drop_index("ix_research_projects_funder_id", table_name="research_projects")
     op.drop_index("ix_research_projects_title", table_name="research_projects")
     op.drop_index("ix_research_projects_university_id", table_name="research_projects")
@@ -554,4 +699,3 @@ def downgrade() -> None:
     op.drop_index("ix_universities_country", table_name="universities")
     op.drop_index("ix_universities_code", table_name="universities")
     op.drop_table("universities")
-

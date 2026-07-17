@@ -25,17 +25,25 @@ def database_connection() -> tuple[list[str], dict[str, str], str]:
     raw = os.getenv("RESEARCHHUB_SYNC_DATABASE_URL") or os.getenv("RESEARCHHUB_DATABASE_URL")
     if not raw:
         raise RuntimeError("RESEARCHHUB_SYNC_DATABASE_URL is required")
-    parsed = urlsplit(raw.replace("postgresql+psycopg://", "postgresql://").replace("postgresql+asyncpg://", "postgresql://"))
+    parsed = urlsplit(
+        raw.replace("postgresql+psycopg://", "postgresql://").replace(
+            "postgresql+asyncpg://", "postgresql://"
+        )
+    )
     if parsed.scheme not in {"postgres", "postgresql"} or not parsed.hostname:
         raise RuntimeError("The configured database URL is not a PostgreSQL URL")
     database = parsed.path.lstrip("/")
     if not database:
         raise RuntimeError("The database URL does not include a database name")
     command = [
-        "--host", parsed.hostname,
-        "--port", str(parsed.port or 5432),
-        "--username", unquote(parsed.username or "postgres"),
-        "--dbname", unquote(database),
+        "--host",
+        parsed.hostname,
+        "--port",
+        str(parsed.port or 5432),
+        "--username",
+        unquote(parsed.username or "postgres"),
+        "--dbname",
+        unquote(database),
     ]
     environment = os.environ.copy()
     if parsed.password:
@@ -60,9 +68,27 @@ def main() -> int:
     destination = args.backup_dir.resolve() / f"researchhub-{timestamp}.dump"
     if destination.exists():
         raise SystemExit(f"Refusing to overwrite {destination}")
-    command = ["pg_dump", "--format=custom", "--no-owner", "--no-privileges", *connection, "--file", str(destination)]
+    command = [
+        "pg_dump",
+        "--format=custom",
+        "--no-owner",
+        "--no-privileges",
+        *connection,
+        "--file",
+        str(destination),
+    ]
     if args.dry_run:
-        print(json.dumps({"status": "DRY_RUN", "database": database, "destination": str(destination), "retention": args.retention}, indent=2))
+        print(
+            json.dumps(
+                {
+                    "status": "DRY_RUN",
+                    "database": database,
+                    "destination": str(destination),
+                    "retention": args.retention,
+                },
+                indent=2,
+            )
+        )
         return 0
     if shutil.which("pg_dump") is None:
         raise SystemExit("pg_dump was not found on PATH")
@@ -80,8 +106,12 @@ def main() -> int:
         "format": "postgresql-custom",
     }
     destination.with_suffix(".json").write_text(json.dumps(manifest, indent=2), encoding="utf-8")
-    backups = sorted(destination.parent.glob("researchhub-*.dump"), key=lambda item: item.stat().st_mtime, reverse=True)
-    for expired in backups[args.retention:]:
+    backups = sorted(
+        destination.parent.glob("researchhub-*.dump"),
+        key=lambda item: item.stat().st_mtime,
+        reverse=True,
+    )
+    for expired in backups[args.retention :]:
         expired.unlink()
         expired.with_suffix(".json").unlink(missing_ok=True)
     print(json.dumps({"status": "PASS", **manifest, "path": str(destination)}, indent=2))

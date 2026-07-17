@@ -5,6 +5,7 @@ from __future__ import annotations
 import uuid
 from datetime import date, datetime
 from decimal import Decimal
+from typing import Any
 
 from pgvector.sqlalchemy import Vector
 from sqlalchemy import (
@@ -56,7 +57,7 @@ class University(Base, TimestampMixin):
     city: Mapped[str | None] = mapped_column(String(120))
     website_url: Mapped[str | None] = mapped_column(String(500))
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, index=True)
-    metadata_json: Mapped[dict] = mapped_column("metadata", JSONB, default=dict)
+    metadata_json: Mapped[dict[str, Any]] = mapped_column("metadata", JSONB, default=dict)
 
     faculties: Mapped[list[Faculty]] = relationship(back_populates="university")
     departments: Mapped[list[Department]] = relationship(back_populates="university")
@@ -109,7 +110,7 @@ class Repository(Base, TimestampMixin):
     metadata_formats: Mapped[list[str]] = mapped_column(JSONB, default=list)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, index=True)
     last_harvested_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
-    metadata_json: Mapped[dict] = mapped_column("metadata", JSONB, default=dict)
+    metadata_json: Mapped[dict[str, Any]] = mapped_column("metadata", JSONB, default=dict)
 
     university: Mapped[University] = relationship(back_populates="repositories")
     publications: Mapped[list[Publication]] = relationship(back_populates="repository")
@@ -177,7 +178,7 @@ class Author(Base, TimestampMixin):
     department_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("departments.id"), index=True
     )
-    metadata_json: Mapped[dict] = mapped_column("metadata", JSONB, default=dict)
+    metadata_json: Mapped[dict[str, Any]] = mapped_column("metadata", JSONB, default=dict)
 
     publications: Mapped[list[PublicationAuthor]] = relationship(back_populates="author")
 
@@ -194,7 +195,7 @@ class Organization(Base, TimestampMixin):
     country: Mapped[str | None] = mapped_column(String(80), index=True)
     ror_id: Mapped[str | None] = mapped_column(String(80), unique=True)
     url: Mapped[str | None] = mapped_column(String(500))
-    metadata_json: Mapped[dict] = mapped_column("metadata", JSONB, default=dict)
+    metadata_json: Mapped[dict[str, Any]] = mapped_column("metadata", JSONB, default=dict)
 
 
 class Publication(Base, TimestampMixin):
@@ -243,9 +244,9 @@ class Publication(Base, TimestampMixin):
     harvested_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), index=True)
     quality_score: Mapped[Decimal | None] = mapped_column(Numeric(5, 2))
     is_deleted: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
-    raw_record: Mapped[dict] = mapped_column(JSONB, default=dict)
-    normalized_record: Mapped[dict] = mapped_column(JSONB, default=dict)
-    metadata_json: Mapped[dict] = mapped_column("metadata", JSONB, default=dict)
+    raw_record: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict)
+    normalized_record: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict)
+    metadata_json: Mapped[dict[str, Any]] = mapped_column("metadata", JSONB, default=dict)
     search_vector: Mapped[str | None] = mapped_column(TSVECTOR)
     embedding: Mapped[list[float] | None] = mapped_column(Vector(384))
     embedding_model: Mapped[str | None] = mapped_column(String(255))
@@ -348,7 +349,7 @@ class Dataset(Base, TimestampMixin):
     url: Mapped[str | None] = mapped_column(String(1000))
     repository: Mapped[str | None] = mapped_column(String(255))
     license: Mapped[str | None] = mapped_column(String(255))
-    metadata_json: Mapped[dict] = mapped_column("metadata", JSONB, default=dict)
+    metadata_json: Mapped[dict[str, Any]] = mapped_column("metadata", JSONB, default=dict)
 
     publication: Mapped[Publication | None] = relationship(back_populates="datasets")
 
@@ -371,7 +372,7 @@ class ResearchProject(Base, TimestampMixin):
         ForeignKey("authors.id"), index=True
     )
     status: Mapped[str | None] = mapped_column(String(80), index=True)
-    metadata_json: Mapped[dict] = mapped_column("metadata", JSONB, default=dict)
+    metadata_json: Mapped[dict[str, Any]] = mapped_column("metadata", JSONB, default=dict)
 
 
 class Citation(Base, TimestampMixin):
@@ -388,7 +389,7 @@ class Citation(Base, TimestampMixin):
     observed_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False, index=True
     )
-    metadata_json: Mapped[dict] = mapped_column("metadata", JSONB, default=dict)
+    metadata_json: Mapped[dict[str, Any]] = mapped_column("metadata", JSONB, default=dict)
 
 
 class Connector(Base, TimestampMixin):
@@ -407,7 +408,7 @@ class Connector(Base, TimestampMixin):
     repository_id: Mapped[uuid.UUID | None] = mapped_column(
         ForeignKey("repositories.id"), index=True
     )
-    config: Mapped[dict] = mapped_column(JSONB, default=dict)
+    config: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict)
     enabled: Mapped[bool] = mapped_column(Boolean, default=True, index=True)
     schedule: Mapped[str | None] = mapped_column(String(120))
     last_cursor: Mapped[str | None] = mapped_column(Text)
@@ -450,7 +451,7 @@ class HarvestJob(Base, TimestampMixin):
     error_count: Mapped[int] = mapped_column(Integer, default=0)
     cursor: Mapped[str | None] = mapped_column(Text)
     error_message: Mapped[str | None] = mapped_column(Text)
-    metadata_json: Mapped[dict] = mapped_column("metadata", JSONB, default=dict)
+    metadata_json: Mapped[dict[str, Any]] = mapped_column("metadata", JSONB, default=dict)
     job_type: Mapped[str] = mapped_column(String(40), default="online_harvest", index=True)
     mode: Mapped[str] = mapped_column(String(30), default="full", index=True)
     requested_by: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
@@ -468,13 +469,13 @@ class HarvestJob(Base, TimestampMixin):
     duplicate_records: Mapped[int] = mapped_column(Integer, default=0)
     skipped_records: Mapped[int] = mapped_column(Integer, default=0)
     failed_records: Mapped[int] = mapped_column(Integer, default=0)
-    checkpoint: Mapped[dict] = mapped_column(JSONB, default=dict)
+    checkpoint: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict)
     resumption_token: Mapped[str | None] = mapped_column(Text)
     input_filename: Mapped[str | None] = mapped_column(String(500))
     input_file_checksum: Mapped[str | None] = mapped_column(String(64), index=True)
     dry_run: Mapped[bool] = mapped_column(Boolean, default=False)
-    error_summary: Mapped[dict] = mapped_column(JSONB, default=dict)
-    result_summary: Mapped[dict] = mapped_column(JSONB, default=dict)
+    error_summary: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict)
+    result_summary: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict)
 
 
 class HarvestLog(Base):
@@ -487,7 +488,7 @@ class HarvestLog(Base):
     level: Mapped[str] = mapped_column(String(20), index=True)
     event: Mapped[str] = mapped_column(String(120), index=True)
     message: Mapped[str] = mapped_column(Text)
-    context: Mapped[dict] = mapped_column(JSONB, default=dict)
+    context: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False, index=True
     )
@@ -506,7 +507,7 @@ class HarvestFailure(Base):
     record_index: Mapped[int | None] = mapped_column(Integer)
     error_type: Mapped[str] = mapped_column(String(120), index=True)
     error_message: Mapped[str] = mapped_column(Text)
-    raw_record: Mapped[dict] = mapped_column(JSONB, default=dict)
+    raw_record: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict)
     retryable: Mapped[bool] = mapped_column(Boolean, default=True, index=True)
     retry_count: Mapped[int] = mapped_column(Integer, default=0)
     resolved: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
@@ -536,7 +537,7 @@ class ImportFile(Base):
         DateTime(timezone=True), server_default=func.now()
     )
     validation_status: Mapped[str] = mapped_column(String(30), default="pending", index=True)
-    validation_errors: Mapped[list[dict]] = mapped_column(JSONB, default=list)
+    validation_errors: Mapped[list[dict[str, Any]]] = mapped_column(JSONB, default=list)
 
 
 class MetadataHistory(Base):
@@ -548,8 +549,8 @@ class MetadataHistory(Base):
     publication_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("publications.id"), index=True)
     source: Mapped[str] = mapped_column(String(120), index=True)
     field_name: Mapped[str] = mapped_column(String(120), index=True)
-    old_value: Mapped[dict | list | str | int | None] = mapped_column(JSONB)
-    new_value: Mapped[dict | list | str | int | None] = mapped_column(JSONB)
+    old_value: Mapped[dict[str, Any] | list[Any] | str | int | None] = mapped_column(JSONB)
+    new_value: Mapped[dict[str, Any] | list[Any] | str | int | None] = mapped_column(JSONB)
     changed_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False, index=True
     )
@@ -591,7 +592,7 @@ class QualityReport(Base):
     generated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False, index=True
     )
-    metadata_json: Mapped[dict] = mapped_column("metadata", JSONB, default=dict)
+    metadata_json: Mapped[dict[str, Any]] = mapped_column("metadata", JSONB, default=dict)
 
     publication: Mapped[Publication] = relationship(back_populates="quality_reports")
 
@@ -627,11 +628,11 @@ class ChatMessage(Base):
     )
     role: Mapped[str] = mapped_column(String(20), index=True)
     content: Mapped[str] = mapped_column(Text)
-    citations: Mapped[list[dict]] = mapped_column(JSONB, default=list)
+    citations: Mapped[list[dict[str, Any]]] = mapped_column(JSONB, default=list)
     retrieved_publication_ids: Mapped[list[str]] = mapped_column(JSONB, default=list)
     model_name: Mapped[str | None] = mapped_column(String(255))
     latency_ms: Mapped[int | None] = mapped_column(Integer)
-    usage: Mapped[dict] = mapped_column(JSONB, default=dict)
+    usage: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict)
     warnings: Mapped[list[str]] = mapped_column(JSONB, default=list)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False, index=True
@@ -784,7 +785,7 @@ class ResearchTrend(Base):
     confidence_score: Mapped[Decimal] = mapped_column(Numeric(5, 4), default=Decimal("0"))
     methodology: Mapped[str] = mapped_column(Text)
     supporting_publication_ids: Mapped[list[str]] = mapped_column(JSONB, default=list)
-    metadata_json: Mapped[dict] = mapped_column("metadata", JSONB, default=dict)
+    metadata_json: Mapped[dict[str, Any]] = mapped_column("metadata", JSONB, default=dict)
     generated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
@@ -807,7 +808,7 @@ class AIJob(Base, TimestampMixin):
     failed_items: Mapped[int] = mapped_column(Integer, default=0)
     progress_percentage: Mapped[Decimal] = mapped_column(Numeric(5, 2), default=Decimal("0"))
     input_hash: Mapped[str | None] = mapped_column(String(64), index=True)
-    result_summary: Mapped[dict] = mapped_column(JSONB, default=dict)
+    result_summary: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict)
     error_message: Mapped[str | None] = mapped_column(Text)
     created_by: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
     started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
@@ -1053,7 +1054,7 @@ class ResearchDocument(Base, TimestampMixin):
     retry_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     last_attempted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
-    metadata_json: Mapped[dict] = mapped_column(
+    metadata_json: Mapped[dict[str, Any]] = mapped_column(
         JSONB,
         nullable=False,
         default=dict,
@@ -1162,7 +1163,7 @@ class DocumentChunk(Base):
         nullable=True,
     )
 
-    chunk_metadata: Mapped[dict] = mapped_column(
+    chunk_metadata: Mapped[dict[str, Any]] = mapped_column(
         JSONB,
         nullable=False,
         default=dict,

@@ -21,7 +21,11 @@ def main() -> int:
     raw = os.getenv("RESEARCHHUB_SYNC_DATABASE_URL") or os.getenv("RESEARCHHUB_DATABASE_URL")
     if not raw:
         raise SystemExit("RESEARCHHUB_SYNC_DATABASE_URL is required")
-    parsed = urlsplit(raw.replace("postgresql+psycopg://", "postgresql://").replace("postgresql+asyncpg://", "postgresql://"))
+    parsed = urlsplit(
+        raw.replace("postgresql+psycopg://", "postgresql://").replace(
+            "postgresql+asyncpg://", "postgresql://"
+        )
+    )
     database = unquote(parsed.path.lstrip("/"))
     if not database or args.confirm_database != database:
         raise SystemExit("Confirmation does not exactly match the configured target database")
@@ -35,15 +39,26 @@ def main() -> int:
     if parsed.password:
         environment["PGPASSWORD"] = unquote(parsed.password)
     command = [
-        "pg_restore", "--exit-on-error", "--no-owner", "--no-privileges",
-        "--host", parsed.hostname or "localhost", "--port", str(parsed.port or 5432),
-        "--username", unquote(parsed.username or "postgres"), "--dbname", database,
+        "pg_restore",
+        "--exit-on-error",
+        "--no-owner",
+        "--no-privileges",
+        "--host",
+        parsed.hostname or "localhost",
+        "--port",
+        str(parsed.port or 5432),
+        "--username",
+        unquote(parsed.username or "postgres"),
+        "--dbname",
+        database,
         str(args.backup.resolve()),
     ]
     print("WARNING: restoring into a non-empty database may fail on existing objects.")
     result = subprocess.run(command, env=environment, check=False)
     status = "PASS" if result.returncode == 0 else "FAIL"
-    print(json.dumps({"status": status, "database": database, "backup": verified["path"]}, indent=2))
+    print(
+        json.dumps({"status": status, "database": database, "backup": verified["path"]}, indent=2)
+    )
     return 0 if result.returncode == 0 else 1
 
 

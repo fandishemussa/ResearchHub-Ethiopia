@@ -15,4 +15,3 @@ __all__ = [
     "normalize_orcid",
     "normalize_title",
 ]
-

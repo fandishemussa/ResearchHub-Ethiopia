@@ -115,7 +115,11 @@ def create_app() -> FastAPI:
     async def readiness(request: Request) -> JSONResponse:
         checks, ready = await dependency_status(request)
         return JSONResponse(
-            {"status": "ready" if ready else "unavailable", "instance_id": instance_id, "checks": checks},
+            {
+                "status": "ready" if ready else "unavailable",
+                "instance_id": instance_id,
+                "checks": checks,
+            },
             status_code=200 if ready else 503,
         )
 

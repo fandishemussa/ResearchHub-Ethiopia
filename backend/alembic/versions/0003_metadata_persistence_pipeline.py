@@ -5,6 +5,8 @@ Revises: 0002_storage_layer_indexes
 Create Date: 2026-07-11
 """
 
+from typing import Any
+
 import sqlalchemy as sa
 from alembic import op
 from sqlalchemy.dialects import postgresql
@@ -15,7 +17,7 @@ branch_labels = None
 depends_on = None
 
 
-def uuid_column() -> sa.Column:
+def uuid_column() -> sa.Column[Any]:
     """Create a UUID primary key column."""
 
     return sa.Column(
@@ -26,12 +28,22 @@ def uuid_column() -> sa.Column:
     )
 
 
-def timestamps() -> tuple[sa.Column, sa.Column]:
+def timestamps() -> tuple[sa.Column[Any], sa.Column[Any]]:
     """Return timestamp columns used by controlled vocabularies."""
 
     return (
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
-        sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False,
+        ),
+        sa.Column(
+            "updated_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False,
+        ),
     )
 
 
@@ -49,7 +61,9 @@ def upgrade() -> None:
         sa.UniqueConstraint("normalized_name"),
     )
     op.create_index("ix_publication_types_name", "publication_types", ["name"])
-    op.create_index("ix_publication_types_normalized_name", "publication_types", ["normalized_name"])
+    op.create_index(
+        "ix_publication_types_normalized_name", "publication_types", ["normalized_name"]
+    )
 
     op.create_table(
         "licenses",
@@ -67,20 +81,32 @@ def upgrade() -> None:
     op.add_column("publications", sa.Column("normalized_title", sa.String(1000)))
     op.add_column(
         "publications",
-        sa.Column("publication_type_id", postgresql.UUID(as_uuid=True), sa.ForeignKey("publication_types.id")),
+        sa.Column(
+            "publication_type_id",
+            postgresql.UUID(as_uuid=True),
+            sa.ForeignKey("publication_types.id"),
+        ),
     )
     op.add_column(
         "publications",
         sa.Column("license_id", postgresql.UUID(as_uuid=True), sa.ForeignKey("licenses.id")),
     )
-    op.add_column("publications", sa.Column("source_urls", postgresql.JSONB(), server_default=sa.text("'[]'::jsonb")))
+    op.add_column(
+        "publications",
+        sa.Column("source_urls", postgresql.JSONB(), server_default=sa.text("'[]'::jsonb")),
+    )
     op.add_column("publications", sa.Column("repository_datestamp", sa.DateTime(timezone=True)))
-    op.add_column("publications", sa.Column("normalized_record", postgresql.JSONB(), server_default=sa.text("'{}'::jsonb")))
+    op.add_column(
+        "publications",
+        sa.Column("normalized_record", postgresql.JSONB(), server_default=sa.text("'{}'::jsonb")),
+    )
 
     op.create_index("ix_publications_normalized_title", "publications", ["normalized_title"])
     op.create_index("ix_publications_publication_type_id", "publications", ["publication_type_id"])
     op.create_index("ix_publications_license_id", "publications", ["license_id"])
-    op.create_index("ix_publications_repository_datestamp", "publications", ["repository_datestamp"])
+    op.create_index(
+        "ix_publications_repository_datestamp", "publications", ["repository_datestamp"]
+    )
     op.create_index(
         "ix_publications_title_year_deleted",
         "publications",

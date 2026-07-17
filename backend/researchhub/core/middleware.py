@@ -54,9 +54,7 @@ class RequestControlMiddleware(BaseHTTPMiddleware):
                 headers={"Retry-After": "1", "X-Request-ID": request_id},
             )
         started = perf_counter()
-        structlog.contextvars.bind_contextvars(
-            request_id=request_id, instance_id=self._instance_id
-        )
+        structlog.contextvars.bind_contextvars(request_id=request_id, instance_id=self._instance_id)
         try:
             async with self._capacity:
                 response = await call_next(request)

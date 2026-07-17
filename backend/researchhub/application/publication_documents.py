@@ -316,12 +316,18 @@ class DocumentSourceProbe:
             pool=self.settings.http_connect_timeout_seconds,
         )
         try:
-            async with httpx.AsyncClient(
-                timeout=timeout,
-                follow_redirects=True,
-                max_redirects=self.settings.document_probe_redirect_limit,
-                headers={"User-Agent": "ResearchHub-Ethiopia/1.0", "Accept-Encoding": "identity"},
-            ) as client, client.stream("GET", url, headers={"Range": "bytes=0-4095"}) as response:
+            async with (
+                httpx.AsyncClient(
+                    timeout=timeout,
+                    follow_redirects=True,
+                    max_redirects=self.settings.document_probe_redirect_limit,
+                    headers={
+                        "User-Agent": "ResearchHub-Ethiopia/1.0",
+                        "Accept-Encoding": "identity",
+                    },
+                ) as client,
+                client.stream("GET", url, headers={"Range": "bytes=0-4095"}) as response,
+            ):
                 await self._validate_url(str(response.url))
                 content_length = int(response.headers.get("content-length", 0)) or None
                 max_bytes = self.settings.document_download_max_size_mb * 1024 * 1024

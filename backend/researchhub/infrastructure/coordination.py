@@ -50,11 +50,7 @@ class DistributedLock:
     async def renew(self) -> bool:
         if not self.acquired:
             return False
-        return bool(
-            await self.redis.eval(
-                _RENEW_SCRIPT, 1, self.key, self.owner, self.ttl_seconds
-            )
-        )
+        return bool(await self.redis.eval(_RENEW_SCRIPT, 1, self.key, self.owner, self.ttl_seconds))
 
     async def release(self) -> bool:
         if not self.acquired:

@@ -30,4 +30,3 @@ async def create_connector(
 
     connector = await service.create_connector(payload)
     return ConnectorRead.model_validate(connector)
-

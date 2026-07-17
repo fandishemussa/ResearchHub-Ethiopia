@@ -37,4 +37,3 @@ class PublicationDeduplicator:
             return True
         self._seen.add(key)
         return False
-

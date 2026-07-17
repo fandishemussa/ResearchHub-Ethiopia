@@ -33,9 +33,7 @@ class Permissions:
     @classmethod
     def all(cls) -> frozenset[str]:
         return frozenset(
-            value
-            for name, value in vars(cls).items()
-            if name.isupper() and isinstance(value, str)
+            value for name, value in vars(cls).items() if name.isupper() and isinstance(value, str)
         )
 
 
@@ -57,9 +55,7 @@ class Roles:
     @classmethod
     def all(cls) -> tuple[str, ...]:
         return tuple(
-            value
-            for name, value in vars(cls).items()
-            if name.isupper() and isinstance(value, str)
+            value for name, value in vars(cls).items() if name.isupper() and isinstance(value, str)
         )
 
 
@@ -138,8 +134,7 @@ ROLE_PERMISSIONS: dict[str, frozenset[str]] = {
     | frozenset({Permissions.AI_USE, Permissions.USERS_READ, Permissions.REPORTS_EXPORT}),
     Roles.DEPARTMENT_COORDINATOR: READ_ONLY
     | frozenset({Permissions.AI_USE, Permissions.METADATA_CORRECT, Permissions.REPORTS_EXPORT}),
-    Roles.RESEARCHER: READ_ONLY
-    | frozenset({Permissions.AI_USE, Permissions.DOCUMENTS_DOWNLOAD}),
+    Roles.RESEARCHER: READ_ONLY | frozenset({Permissions.AI_USE, Permissions.DOCUMENTS_DOWNLOAD}),
     Roles.GRADUATE_STUDENT: READ_ONLY
     | frozenset({Permissions.AI_USE, Permissions.DOCUMENTS_DOWNLOAD}),
     Roles.PUBLIC_USER: frozenset({Permissions.PUBLICATIONS_READ}),

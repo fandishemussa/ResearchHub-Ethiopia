@@ -93,11 +93,7 @@ class DocumentDownloadRunner:
 
         self.download_retries = retries
         self.overwrite = overwrite
-        self.max_bytes = (
-            max_file_size_mb
-            * 1024
-            * 1024
-        )
+        self.max_bytes = max_file_size_mb * 1024 * 1024
 
         # Preserve CLI compatibility with --all-pdfs.
         self.all_documents = all_pdfs
@@ -128,14 +124,10 @@ class DocumentDownloadRunner:
             }:
                 continue
 
-            external_id = document.get(
-                "external_id"
-            )
+            external_id = document.get("external_id")
 
             if external_id:
-                completed.add(
-                    str(external_id)
-                )
+                completed.add(str(external_id))
 
         return completed
 
@@ -177,12 +169,12 @@ class DocumentDownloadRunner:
                 page_size=page_size,
             )
 
-        raise ValueError(
-            "Unsupported source kind: "
-            f"{self.source.kind}"
-        )
+        raise ValueError(f"Unsupported source kind: {self.source.kind}")
 
-    def discover(self, publication: Publication,) -> list[DocumentCandidate]:
+    def discover(
+        self,
+        publication: Publication,
+    ) -> list[DocumentCandidate]:
         if self.source.kind in {
             "bdu_legacy_rest",
             "bdu_oai",
@@ -223,17 +215,9 @@ class DocumentDownloadRunner:
         index: int,
         extension: str,
     ) -> Path:
-        source_name = (
-            candidate.filename
-            or url_filename(candidate.url)
-            or f"document{extension}"
-        )
+        source_name = candidate.filename or url_filename(candidate.url) or f"document{extension}"
 
-        external_id_suffix = (
-            publication.external_id
-            .rsplit("/", 1)[-1]
-            .rsplit(":", 1)[-1]
-        )
+        external_id_suffix = publication.external_id.rsplit("/", 1)[-1].rsplit(":", 1)[-1]
 
         id_part = safe_filename(
             external_id_suffix,
@@ -242,37 +226,21 @@ class DocumentDownloadRunner:
         )
 
         title_part = safe_filename(
-            publication.title
-            or Path(source_name).stem,
+            publication.title or Path(source_name).stem,
             "document",
             100,
         )
 
-        suffix = (
-            f"_{index}"
-            if index > 1
-            else ""
-        )
+        suffix = f"_{index}" if index > 1 else ""
 
-        type_directory = (
-            self.output_dir
-            / extension.lstrip(".")
-        )
+        type_directory = self.output_dir / extension.lstrip(".")
 
         type_directory.mkdir(
             parents=True,
             exist_ok=True,
         )
 
-        return (
-            type_directory
-            / (
-                f"{id_part}_"
-                f"{title_part}"
-                f"{suffix}"
-                f"{extension}"
-            )
-        )
+        return type_directory / (f"{id_part}_{title_part}{suffix}{extension}")
 
     def _register_candidate(
         self,
@@ -299,22 +267,14 @@ class DocumentDownloadRunner:
             landing_url=publication.landing_url,
             document_url=candidate.url,
             filename=candidate.filename,
-            document_type=(
-                guessed_extension.lstrip(".")
-                if guessed_extension
-                else None
-            ),
+            document_type=(guessed_extension.lstrip(".") if guessed_extension else None),
             mime_type=candidate.mime_type,
-            expected_size_bytes=(
-                candidate.size_bytes
-            ),
+            expected_size_bytes=(candidate.size_bytes),
             authors=authors or [],
             issued_date=issued_date,
             metadata={
                 "candidate_index": index,
-                "repository_kind": (
-                    self.source.kind
-                ),
+                "repository_kind": (self.source.kind),
             },
         )
 
@@ -324,13 +284,11 @@ class DocumentDownloadRunner:
         candidate: DocumentCandidate,
         index: int,
     ) -> DownloadResult:
-        guessed_extension = (
-            detect_document_extension(
-                url=candidate.url,
-                content_type=candidate.mime_type,
-                first_bytes=b"",
-                filename=candidate.filename,
-            )
+        guessed_extension = detect_document_extension(
+            url=candidate.url,
+            content_type=candidate.mime_type,
+            first_bytes=b"",
+            filename=candidate.filename,
         )
 
         document_id = self._register_candidate(
@@ -340,31 +298,19 @@ class DocumentDownloadRunner:
             guessed_extension,
         )
 
-        provisional_extension = (
-            guessed_extension
-            or ".bin"
+        provisional_extension = guessed_extension or ".bin"
+
+        provisional_target = self._base_target_path(
+            publication,
+            candidate,
+            index,
+            provisional_extension,
         )
 
-        provisional_target = (
-            self._base_target_path(
-                publication,
-                candidate,
-                index,
-                provisional_extension,
-            )
-        )
-
-        part_path = (
-            provisional_target.with_suffix(
-                provisional_target.suffix
-                + ".part"
-            )
-        )
+        part_path = provisional_target.with_suffix(provisional_target.suffix + ".part")
 
         last_error: Exception | None = None
-        expected_total: int | None = (
-            candidate.size_bytes
-        )
+        expected_total: int | None = candidate.size_bytes
 
         for attempt in range(
             1,
@@ -373,11 +319,7 @@ class DocumentDownloadRunner:
             response = None
 
             try:
-                saved_bytes = (
-                    part_path.stat().st_size
-                    if part_path.exists()
-                    else 0
-                )
+                saved_bytes = part_path.stat().st_size if part_path.exists() else 0
 
                 headers = {
                     "Accept": (
@@ -394,9 +336,7 @@ class DocumentDownloadRunner:
                 }
 
                 if saved_bytes > 0:
-                    headers["Range"] = (
-                        f"bytes={saved_bytes}-"
-                    )
+                    headers["Range"] = f"bytes={saved_bytes}-"
 
                     LOGGER.info(
                         "Resuming %s from byte %s",
@@ -407,12 +347,8 @@ class DocumentDownloadRunner:
                 self.manifest.mark_downloading(
                     document_id,
                     partial_path=str(part_path),
-                    downloaded_size_bytes=(
-                        saved_bytes
-                    ),
-                    expected_size_bytes=(
-                        expected_total
-                    ),
+                    downloaded_size_bytes=(saved_bytes),
+                    expected_size_bytes=(expected_total),
                     retry_count=attempt - 1,
                 )
 
@@ -425,32 +361,20 @@ class DocumentDownloadRunner:
                     ),
                 )
 
-                status_code = (
-                    response.status_code
-                )
+                status_code = response.status_code
 
                 if saved_bytes > 0:
                     if status_code == 206:
-                        content_range = (
-                            response.headers.get(
-                                "Content-Range",
-                                "",
-                            )
+                        content_range = response.headers.get(
+                            "Content-Range",
+                            "",
                         )
 
-                        expected_prefix = (
-                            f"bytes {saved_bytes}-"
-                        )
+                        expected_prefix = f"bytes {saved_bytes}-"
 
-                        if (
-                            content_range
-                            and not content_range.startswith(
-                                expected_prefix
-                            )
-                        ):
+                        if content_range and not content_range.startswith(expected_prefix):
                             LOGGER.warning(
-                                "Unexpected Content-Range "
-                                "%r for %s; restarting",
+                                "Unexpected Content-Range %r for %s; restarting",
                                 content_range,
                                 candidate.url,
                             )
@@ -458,80 +382,50 @@ class DocumentDownloadRunner:
                             response.close()
                             response = None
 
-                            part_path.unlink(
-                                missing_ok=True
-                            )
+                            part_path.unlink(missing_ok=True)
 
                             saved_bytes = 0
-                            expected_total = (
-                                candidate.size_bytes
-                            )
+                            expected_total = candidate.size_bytes
 
                             continue
 
                     elif status_code == 416:
                         LOGGER.warning(
-                            "Server rejected resume "
-                            "position for %s; restarting",
+                            "Server rejected resume position for %s; restarting",
                             candidate.url,
                         )
 
                         response.close()
                         response = None
 
-                        part_path.unlink(
-                            missing_ok=True
-                        )
+                        part_path.unlink(missing_ok=True)
 
                         saved_bytes = 0
-                        expected_total = (
-                            candidate.size_bytes
-                        )
+                        expected_total = candidate.size_bytes
 
                         continue
 
                     else:
                         LOGGER.warning(
-                            "Server ignored Range request "
-                            "for %s; restarting from zero",
+                            "Server ignored Range request for %s; restarting from zero",
                             candidate.url,
                         )
 
-                        part_path.unlink(
-                            missing_ok=True
-                        )
+                        part_path.unlink(missing_ok=True)
 
                         saved_bytes = 0
 
-                declared_length = (
-                    response.headers.get(
-                        "Content-Length"
-                    )
-                )
+                declared_length = response.headers.get("Content-Length")
 
-                if (
-                    declared_length
-                    and declared_length.isdigit()
-                ):
-                    response_bytes = int(
-                        declared_length
-                    )
+                if declared_length and declared_length.isdigit():
+                    response_bytes = int(declared_length)
 
                     expected_total = (
-                        saved_bytes
-                        + response_bytes
-                        if status_code == 206
-                        else response_bytes
+                        saved_bytes + response_bytes if status_code == 206 else response_bytes
                     )
 
-                    if (
-                        expected_total
-                        > self.max_bytes
-                    ):
-                        message = (
-                            "File exceeds maximum size "
-                            f"of {self.max_bytes} bytes"
-                        )
+                    if expected_total > self.max_bytes:
+                        message = f"File exceeds maximum size of {self.max_bytes} bytes"
 
                         self.manifest.mark_skipped(
                             document_id,
@@ -547,65 +441,33 @@ class DocumentDownloadRunner:
                             None,
                             "skipped",
                             document_type=(
-                                guessed_extension
-                                .lstrip(".")
-                                if guessed_extension
-                                else None
+                                guessed_extension.lstrip(".") if guessed_extension else None
                             ),
-                            mime_type=(
-                                candidate.mime_type
-                            ),
-                            size_bytes=(
-                                expected_total
-                            ),
+                            mime_type=(candidate.mime_type),
+                            size_bytes=(expected_total),
                             message=message,
                         )
 
-                append_mode = (
-                    saved_bytes > 0
-                    and status_code == 206
-                )
+                append_mode = saved_bytes > 0 and status_code == 206
 
-                file_mode = (
-                    "ab"
-                    if append_mode
-                    else "wb"
-                )
+                file_mode = "ab" if append_mode else "wb"
 
-                total_written = (
-                    saved_bytes
-                    if append_mode
-                    else 0
-                )
+                total_written = saved_bytes if append_mode else 0
 
-                last_manifest_update = (
-                    total_written
-                )
+                last_manifest_update = total_written
 
                 first_bytes = b""
 
                 self.manifest.mark_downloading(
                     document_id,
                     partial_path=str(part_path),
-                    downloaded_size_bytes=(
-                        total_written
-                    ),
-                    expected_size_bytes=(
-                        expected_total
-                    ),
+                    downloaded_size_bytes=(total_written),
+                    expected_size_bytes=(expected_total),
                     retry_count=attempt - 1,
                 )
 
-                with part_path.open(
-                    file_mode
-                ) as output_file:
-                    for chunk in (
-                        response.iter_content(
-                            chunk_size=(
-                                DOWNLOAD_CHUNK_SIZE
-                            )
-                        )
-                    ):
+                with part_path.open(file_mode) as output_file:
+                    for chunk in response.iter_content(chunk_size=(DOWNLOAD_CHUNK_SIZE)):
                         if not chunk:
                             continue
 
@@ -614,79 +476,44 @@ class DocumentDownloadRunner:
 
                         output_file.write(chunk)
 
-                        total_written += len(
-                            chunk
-                        )
+                        total_written += len(chunk)
 
-                        if (
-                            total_written
-                            > self.max_bytes
-                        ):
-                            raise ValueError(
-                                "File exceeds maximum "
-                                f"size of "
-                                f"{self.max_bytes} bytes"
-                            )
+                        if total_written > self.max_bytes:
+                            raise ValueError(f"File exceeds maximum size of {self.max_bytes} bytes")
 
-                        progress_since_update = (
-                            total_written
-                            - last_manifest_update
-                        )
+                        progress_since_update = total_written - last_manifest_update
 
-                        if (
-                            progress_since_update
-                            >= MANIFEST_UPDATE_INTERVAL_BYTES
-                        ):
+                        if progress_since_update >= MANIFEST_UPDATE_INTERVAL_BYTES:
                             output_file.flush()
 
                             self.manifest.mark_downloading(
                                 document_id,
-                                partial_path=(
-                                    str(part_path)
-                                ),
-                                downloaded_size_bytes=(
-                                    total_written
-                                ),
-                                expected_size_bytes=(
-                                    expected_total
-                                ),
-                                retry_count=(
-                                    attempt - 1
-                                ),
+                                partial_path=(str(part_path)),
+                                downloaded_size_bytes=(total_written),
+                                expected_size_bytes=(expected_total),
+                                retry_count=(attempt - 1),
                             )
 
-                            last_manifest_update = (
-                                total_written
-                            )
+                            last_manifest_update = total_written
 
                             if expected_total:
                                 percent = min(
                                     100.0,
-                                    (
-                                        total_written
-                                        / expected_total
-                                    )
-                                    * 100.0,
+                                    (total_written / expected_total) * 100.0,
                                 )
 
                                 LOGGER.info(
-                                    "Downloading %s: "
-                                    "%.2f MB / %.2f MB "
-                                    "(%.2f%%)",
+                                    "Downloading %s: %.2f MB / %.2f MB (%.2f%%)",
                                     candidate.url,
-                                    total_written
-                                    / (1024 * 1024),
-                                    expected_total
-                                    / (1024 * 1024),
+                                    total_written / (1024 * 1024),
+                                    expected_total / (1024 * 1024),
                                     percent,
                                 )
                             else:
                                 LOGGER.info(
-                                    "Downloading %s: "
-                                    "%.2f MB saved",
+                                    "Downloading %s: %.2f MB saved",
                                     candidate.url,
-                                    total_written
-                                    / (1024 * 1024),
+                                    total_written / (1024 * 1024),
                                 )
 
                     output_file.flush()
@@ -694,42 +521,22 @@ class DocumentDownloadRunner:
                 self.manifest.mark_downloading(
                     document_id,
                     partial_path=str(part_path),
-                    downloaded_size_bytes=(
-                        total_written
-                    ),
-                    expected_size_bytes=(
-                        expected_total
-                    ),
+                    downloaded_size_bytes=(total_written),
+                    expected_size_bytes=(expected_total),
                     retry_count=attempt - 1,
                 )
 
                 if append_mode:
-                    with part_path.open(
-                        "rb"
-                    ) as file_handle:
-                        first_bytes = (
-                            file_handle.read(16)
-                        )
+                    with part_path.open("rb") as file_handle:
+                        first_bytes = file_handle.read(16)
 
-                content_type = (
-                    normalize_content_type(
-                        response.headers.get(
-                            "Content-Type"
-                        )
-                    )
-                )
+                content_type = normalize_content_type(response.headers.get("Content-Type"))
 
-                extension = (
-                    detect_document_extension(
-                        url=candidate.url,
-                        content_type=(
-                            content_type
-                        ),
-                        first_bytes=first_bytes,
-                        filename=(
-                            candidate.filename
-                        ),
-                    )
+                extension = detect_document_extension(
+                    url=candidate.url,
+                    content_type=(content_type),
+                    first_bytes=first_bytes,
+                    filename=(candidate.filename),
                 )
 
                 if extension is None:
@@ -748,32 +555,19 @@ class DocumentDownloadRunner:
                     extension,
                 )
 
-                if (
-                    target.exists()
-                    and not self.overwrite
-                ):
-                    part_path.unlink(
-                        missing_ok=True
-                    )
+                if target.exists() and not self.overwrite:
+                    part_path.unlink(missing_ok=True)
 
-                    checksum = sha256_file(
-                        target
-                    )
+                    checksum = sha256_file(target)
 
                     self.manifest.mark_already_exists(
                         document_id,
                         local_path=str(target),
-                        size_bytes=(
-                            target.stat().st_size
-                        ),
-                        checksum_sha256=(
-                            checksum
-                        ),
+                        size_bytes=(target.stat().st_size),
+                        checksum_sha256=(checksum),
                     )
 
-                    self.completed.add(
-                        publication.external_id
-                    )
+                    self.completed.add(publication.external_id)
 
                     return DownloadResult(
                         self.source.key,
@@ -784,10 +578,7 @@ class DocumentDownloadRunner:
                         str(target),
                         "already_exists",
                         extension.lstrip("."),
-                        (
-                            content_type
-                            or candidate.mime_type
-                        ),
+                        (content_type or candidate.mime_type),
                         target.stat().st_size,
                         checksum,
                     )
@@ -804,31 +595,20 @@ class DocumentDownloadRunner:
 
                 part_path.replace(target)
 
-                file_size = (
-                    target.stat().st_size
-                )
+                file_size = target.stat().st_size
 
-                checksum = sha256_file(
-                    target
-                )
+                checksum = sha256_file(target)
 
                 self.manifest.mark_downloaded(
                     document_id,
                     local_path=str(target),
-                    document_type=(
-                        extension.lstrip(".")
-                    ),
-                    mime_type=(
-                        content_type
-                        or candidate.mime_type
-                    ),
+                    document_type=(extension.lstrip(".")),
+                    mime_type=(content_type or candidate.mime_type),
                     size_bytes=file_size,
                     checksum_sha256=checksum,
                 )
 
-                self.completed.add(
-                    publication.external_id
-                )
+                self.completed.add(publication.external_id)
 
                 return DownloadResult(
                     self.source.key,
@@ -839,10 +619,7 @@ class DocumentDownloadRunner:
                     str(target),
                     "downloaded",
                     extension.lstrip("."),
-                    (
-                        content_type
-                        or candidate.mime_type
-                    ),
+                    (content_type or candidate.mime_type),
                     file_size,
                     checksum,
                 )
@@ -850,16 +627,10 @@ class DocumentDownloadRunner:
             except RETRYABLE_DOWNLOAD_ERRORS as exc:
                 last_error = exc
 
-                saved_bytes = (
-                    part_path.stat().st_size
-                    if part_path.exists()
-                    else 0
-                )
+                saved_bytes = part_path.stat().st_size if part_path.exists() else 0
 
                 LOGGER.warning(
-                    "Interrupted download for %s "
-                    "(attempt %s/%s, "
-                    "saved=%s bytes): %s",
+                    "Interrupted download for %s (attempt %s/%s, saved=%s bytes): %s",
                     candidate.url,
                     attempt,
                     self.download_retries,
@@ -870,23 +641,16 @@ class DocumentDownloadRunner:
                 self.manifest.mark_downloading(
                     document_id,
                     partial_path=str(part_path),
-                    downloaded_size_bytes=(
-                        saved_bytes
-                    ),
-                    expected_size_bytes=(
-                        expected_total
-                    ),
+                    downloaded_size_bytes=(saved_bytes),
+                    expected_size_bytes=(expected_total),
                     retry_count=attempt,
                 )
 
-                if (
-                    attempt
-                    >= self.download_retries
-                ):
+                if attempt >= self.download_retries:
                     break
 
                 wait = min(
-                    2 ** attempt,
+                    2**attempt,
                     MAX_DOWNLOAD_BACKOFF_SECONDS,
                 )
 
@@ -896,8 +660,7 @@ class DocumentDownloadRunner:
                 )
 
                 LOGGER.info(
-                    "Waiting %.1f seconds before "
-                    "resuming download",
+                    "Waiting %.1f seconds before resuming download",
                     wait,
                 )
 
@@ -906,18 +669,11 @@ class DocumentDownloadRunner:
             except ValueError as exc:
                 last_error = exc
 
-                saved_bytes = (
-                    part_path.stat().st_size
-                    if part_path.exists()
-                    else 0
-                )
+                saved_bytes = part_path.stat().st_size if part_path.exists() else 0
 
                 message = str(exc)
 
-                if (
-                    "exceeds maximum size"
-                    in message.lower()
-                ):
+                if "exceeds maximum size" in message.lower():
                     self.manifest.mark_skipped(
                         document_id,
                         message=message,
@@ -926,14 +682,8 @@ class DocumentDownloadRunner:
                     self.manifest.mark_failed(
                         document_id,
                         message=message,
-                        downloaded_size_bytes=(
-                            saved_bytes
-                        ),
-                        partial_path=(
-                            str(part_path)
-                            if part_path.exists()
-                            else None
-                        ),
+                        downloaded_size_bytes=(saved_bytes),
+                        partial_path=(str(part_path) if part_path.exists() else None),
                         retry_count=attempt,
                     )
 
@@ -942,23 +692,13 @@ class DocumentDownloadRunner:
             except Exception as exc:
                 last_error = exc
 
-                saved_bytes = (
-                    part_path.stat().st_size
-                    if part_path.exists()
-                    else 0
-                )
+                saved_bytes = part_path.stat().st_size if part_path.exists() else 0
 
                 self.manifest.mark_failed(
                     document_id,
                     message=str(exc),
-                    downloaded_size_bytes=(
-                        saved_bytes
-                    ),
-                    partial_path=(
-                        str(part_path)
-                        if part_path.exists()
-                        else None
-                    ),
+                    downloaded_size_bytes=(saved_bytes),
+                    partial_path=(str(part_path) if part_path.exists() else None),
                     retry_count=attempt,
                 )
 
@@ -968,32 +708,16 @@ class DocumentDownloadRunner:
                 if response is not None:
                     response.close()
 
-        saved_bytes = (
-            part_path.stat().st_size
-            if part_path.exists()
-            else 0
-        )
+        saved_bytes = part_path.stat().st_size if part_path.exists() else 0
 
-        failure_message = (
-            str(last_error)
-            if last_error
-            else "Download failed"
-        )
+        failure_message = str(last_error) if last_error else "Download failed"
 
         self.manifest.mark_failed(
             document_id,
             message=failure_message,
-            downloaded_size_bytes=(
-                saved_bytes
-            ),
-            partial_path=(
-                str(part_path)
-                if part_path.exists()
-                else None
-            ),
-            retry_count=(
-                self.download_retries
-            ),
+            downloaded_size_bytes=(saved_bytes),
+            partial_path=(str(part_path) if part_path.exists() else None),
+            retry_count=(self.download_retries),
         )
 
         return DownloadResult(
@@ -1004,11 +728,7 @@ class DocumentDownloadRunner:
             candidate.url,
             None,
             "failed",
-            (
-                guessed_extension.lstrip(".")
-                if guessed_extension
-                else None
-            ),
+            (guessed_extension.lstrip(".") if guessed_extension else None),
             candidate.mime_type,
             saved_bytes,
             message=failure_message,
@@ -1042,17 +762,10 @@ class DocumentDownloadRunner:
                 LOGGER.info(
                     "[%s] %s",
                     position,
-                    (
-                        publication.title
-                        or publication.external_id
-                    ),
+                    (publication.title or publication.external_id),
                 )
 
-                if (
-                    resume
-                    and publication.external_id
-                    in self.completed
-                ):
+                if resume and publication.external_id in self.completed:
                     LOGGER.info(
                         "Skipping completed record %s",
                         publication.external_id,
@@ -1060,14 +773,11 @@ class DocumentDownloadRunner:
                     continue
 
                 try:
-                    candidates = self.discover(
-                        publication
-                    )
+                    candidates = self.discover(publication)
 
                 except Exception as exc:
                     LOGGER.exception(
-                        "Document discovery failed "
-                        "for %s",
+                        "Document discovery failed for %s",
                         publication.external_id,
                     )
 
@@ -1079,10 +789,7 @@ class DocumentDownloadRunner:
                         None,
                         None,
                         "failed",
-                        message=(
-                            "Document discovery "
-                            f"failed: {exc}"
-                        ),
+                        message=(f"Document discovery failed: {exc}"),
                     )
 
                     results.append(result)
@@ -1090,8 +797,7 @@ class DocumentDownloadRunner:
 
                 if not candidates:
                     LOGGER.warning(
-                        "No public PDF, DOC, or "
-                        "DOCX document found for %s",
+                        "No public PDF, DOC, or DOCX document found for %s",
                         publication.external_id,
                     )
 
@@ -1103,31 +809,22 @@ class DocumentDownloadRunner:
                         None,
                         None,
                         "not_found",
-                        message=(
-                            "No public PDF, DOC, "
-                            "or DOCX link discovered"
-                        ),
+                        message=("No public PDF, DOC, or DOCX link discovered"),
                     )
 
                     results.append(result)
                     continue
 
-                selected_candidates = (
-                    candidates
-                    if self.all_documents
-                    else candidates[:1]
-                )
+                selected_candidates = candidates if self.all_documents else candidates[:1]
 
                 for index, candidate in enumerate(
                     selected_candidates,
                     start=1,
                 ):
-                    result = (
-                        self._download_candidate(
-                            publication,
-                            candidate,
-                            index,
-                        )
+                    result = self._download_candidate(
+                        publication,
+                        candidate,
+                        index,
                     )
 
                     results.append(result)
@@ -1138,12 +835,7 @@ class DocumentDownloadRunner:
                     }:
                         successful_downloads += 1
 
-                        if (
-                            max_downloads
-                            is not None
-                            and successful_downloads
-                            >= max_downloads
-                        ):
+                        if max_downloads is not None and successful_downloads >= max_downloads:
                             return results
 
             return results
@@ -1183,9 +875,7 @@ def write_summary(
             }
             and result.document_type
         ):
-            document_types[
-                result.document_type
-            ] = (
+            document_types[result.document_type] = (
                 document_types.get(
                     result.document_type,
                     0,
@@ -1193,45 +883,32 @@ def write_summary(
                 + 1
             )
 
-        if (
-            result.status
-            in {
-                "downloaded",
-                "already_exists",
-            }
-            and isinstance(
-                result.size_bytes,
-                int,
-            )
+        if result.status in {
+            "downloaded",
+            "already_exists",
+        } and isinstance(
+            result.size_bytes,
+            int,
         ):
-            total_downloaded_bytes += (
-                result.size_bytes
-            )
+            total_downloaded_bytes += result.size_bytes
 
     summary = {
         "source": source_key,
         "total_results": len(results),
         "counts": counts,
         "document_types": document_types,
-        "total_downloaded_bytes": (
-            total_downloaded_bytes
-        ),
+        "total_downloaded_bytes": (total_downloaded_bytes),
         "manifest": "manifest.json",
     }
 
-    source_directory = (
-        output_dir / source_key
-    )
+    source_directory = output_dir / source_key
 
     source_directory.mkdir(
         parents=True,
         exist_ok=True,
     )
 
-    path = (
-        source_directory
-        / "summary.json"
-    )
+    path = source_directory / "summary.json"
 
     path.write_text(
         json.dumps(

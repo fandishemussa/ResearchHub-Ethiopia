@@ -15,20 +15,28 @@ from urllib.request import Request, urlopen
 
 def request_json(url: str, timeout: float) -> tuple[int, Any, float]:
     started = time.perf_counter()
-    request = Request(url, headers={"Accept": "application/json", "User-Agent": "ResearchHubSearchEvaluation/1"})
+    request = Request(
+        url, headers={"Accept": "application/json", "User-Agent": "ResearchHubSearchEvaluation/1"}
+    )
     try:
         with urlopen(request, timeout=timeout) as response:  # noqa: S310 - operator supplied URL
             payload = json.loads(response.read().decode("utf-8"))
             return response.status, payload, (time.perf_counter() - started) * 1000
     except HTTPError as exc:
-        return exc.code, exc.read().decode("utf-8", errors="replace"), (time.perf_counter() - started) * 1000
+        return (
+            exc.code,
+            exc.read().decode("utf-8", errors="replace"),
+            (time.perf_counter() - started) * 1000,
+        )
 
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--api-url", default="http://localhost:8111")
     parser.add_argument("--queries", type=Path, default=Path("data/search_evaluation_queries.json"))
-    parser.add_argument("--output", type=Path, default=Path("artifacts/search-evaluation-results.json"))
+    parser.add_argument(
+        "--output", type=Path, default=Path("artifacts/search-evaluation-results.json")
+    )
     parser.add_argument("--top-k", type=int, default=10)
     parser.add_argument("--timeout", type=float, default=30)
     args = parser.parse_args()
@@ -55,8 +63,19 @@ def main() -> int:
                 status, payload, duration = 0, {"error": f"{type(exc).__name__}: {exc}"}, 0.0
             if status != 200:
                 failures += 1
-            variants[variant] = {"status": status, "duration_ms": round(duration, 2), "response": payload}
-        results.append({"id": item.get("id"), "query": query, "intent": item.get("intent"), "variants": variants})
+            variants[variant] = {
+                "status": status,
+                "duration_ms": round(duration, 2),
+                "response": payload,
+            }
+        results.append(
+            {
+                "id": item.get("id"),
+                "query": query,
+                "intent": item.get("intent"),
+                "variants": variants,
+            }
+        )
     report = {
         "created_at": datetime.now(UTC).isoformat(),
         "api_url": args.api_url,
@@ -67,7 +86,17 @@ def main() -> int:
     }
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(report, indent=2), encoding="utf-8")
-    print(json.dumps({"status": "PASS" if failures == 0 else "INCOMPLETE", "queries": len(results), "failed_requests": failures, "output": str(args.output)}, indent=2))
+    print(
+        json.dumps(
+            {
+                "status": "PASS" if failures == 0 else "INCOMPLETE",
+                "queries": len(results),
+                "failed_requests": failures,
+                "output": str(args.output),
+            },
+            indent=2,
+        )
+    )
     return 0 if failures == 0 else 1
 
 

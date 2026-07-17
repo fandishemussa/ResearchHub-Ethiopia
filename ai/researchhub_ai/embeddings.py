@@ -107,7 +107,15 @@ class SentenceTransformerEmbeddingService:
                 convert_to_numpy=True,
                 show_progress_bar=False,
             )
-        return embeddings.tolist()
+        raw_embeddings: object = embeddings.tolist()
+        if not isinstance(raw_embeddings, list):
+            raise TypeError("Embedding model returned a non-list result")
+        result: list[list[float]] = []
+        for row in raw_embeddings:
+            if not isinstance(row, list):
+                raise TypeError("Embedding model returned a non-list vector")
+            result.append([float(value) for value in row])
+        return result
 
     def encode_query(self, query: str) -> list[float]:
         normalized = normalize_whitespace(query)
@@ -130,8 +138,8 @@ class SentenceTransformerEmbeddingService:
 
 @lru_cache(maxsize=8)
 def get_embedding_service(
-        model_name: str = DEFAULT_MODEL,
-        device: str = "cpu",
+    model_name: str = DEFAULT_MODEL,
+    device: str = "cpu",
 ) -> SentenceTransformerEmbeddingService:
     """Return one lazy encoder per model/device pair."""
 

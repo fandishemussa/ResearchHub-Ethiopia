@@ -40,7 +40,9 @@ def arguments() -> argparse.Namespace:
 
 
 def fetch_json(url: str, timeout: float) -> tuple[int, Any]:
-    request = Request(url, headers={"Accept": "application/json", "User-Agent": "ResearchHubVerifier/1"})
+    request = Request(
+        url, headers={"Accept": "application/json", "User-Agent": "ResearchHubVerifier/1"}
+    )
     try:
         with urlopen(request, timeout=timeout) as response:  # noqa: S310 - operator supplied URL
             return response.status, json.loads(response.read().decode("utf-8"))
@@ -90,7 +92,11 @@ def route_checks(api_url: str, timeout: float) -> list[Check]:
     for name, required in ROUTE_GROUPS.items():
         missing = [path for path in required if path not in paths]
         results.append(
-            Check(name, "FAIL" if missing else "PASS", f"Missing: {', '.join(missing)}" if missing else "Required paths declared")
+            Check(
+                name,
+                "FAIL" if missing else "PASS",
+                f"Missing: {', '.join(missing)}" if missing else "Required paths declared",
+            )
         )
     return results
 
@@ -105,8 +111,14 @@ def dependency_checks(api_url: str, timeout: float) -> list[Check]:
     results = []
     for name, reported_name in (("database", "postgres"), ("redis", "redis")):
         value = checks.get(reported_name)
-        healthy = value is True or value == "ok" or (isinstance(value, dict) and value.get("status") == "ok")
-        results.append(Check(name, "PASS" if healthy else "FAIL", f"HTTP {status}; reported={value!r}"))
+        healthy = (
+            value is True
+            or value == "ok"
+            or (isinstance(value, dict) and value.get("status") == "ok")
+        )
+        results.append(
+            Check(name, "PASS" if healthy else "FAIL", f"HTTP {status}; reported={value!r}")
+        )
     return results
 
 

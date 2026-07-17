@@ -5,6 +5,7 @@ Revises: 0008_ai_operations_foundation
 """
 
 from collections.abc import Sequence
+from typing import Any
 
 import sqlalchemy as sa
 from alembic import op
@@ -19,7 +20,7 @@ depends_on: str | Sequence[str] | None = None
 def upgrade() -> None:
     uuid = postgresql.UUID(as_uuid=True)
     timestamp = sa.DateTime(timezone=True)
-    connector_columns = [
+    connector_columns: list[sa.Column[Any]] = [
         sa.Column("journal_id", uuid, sa.ForeignKey("journals.id")),
         sa.Column("description", sa.Text()),
         sa.Column("api_url", sa.String(500)),
@@ -38,12 +39,14 @@ def upgrade() -> None:
         sa.Column("total_active_records", sa.Integer(), nullable=False, server_default="0"),
         sa.Column("total_deleted_records", sa.Integer(), nullable=False, server_default="0"),
     ]
-    for column in connector_columns:
-        op.add_column("connectors", column)
-    for column in ("journal_id", "oai_endpoint", "status"):
-        op.create_index(f"ix_connectors_{column}", "connectors", [column])
+    for connector_column in connector_columns:
+        op.add_column("connectors", connector_column)
+    for connector_index_name in ("journal_id", "oai_endpoint", "status"):
+        op.create_index(
+            f"ix_connectors_{connector_index_name}", "connectors", [connector_index_name]
+        )
 
-    job_columns = [
+    job_columns: list[sa.Column[Any]] = [
         sa.Column("job_type", sa.String(40), nullable=False, server_default="online_harvest"),
         sa.Column("mode", sa.String(30), nullable=False, server_default="full"),
         sa.Column("requested_by", uuid),
@@ -69,10 +72,10 @@ def upgrade() -> None:
         sa.Column("error_summary", postgresql.JSONB(), nullable=False, server_default="{}"),
         sa.Column("result_summary", postgresql.JSONB(), nullable=False, server_default="{}"),
     ]
-    for column in job_columns:
-        op.add_column("harvest_jobs", column)
-    for column in ("job_type", "mode", "input_file_checksum"):
-        op.create_index(f"ix_harvest_jobs_{column}", "harvest_jobs", [column])
+    for job_column in job_columns:
+        op.add_column("harvest_jobs", job_column)
+    for job_index_name in ("job_type", "mode", "input_file_checksum"):
+        op.create_index(f"ix_harvest_jobs_{job_index_name}", "harvest_jobs", [job_index_name])
 
     op.create_table(
         "harvest_failures",
@@ -94,7 +97,7 @@ def upgrade() -> None:
         sa.Column("resolved_at", timestamp),
         sa.Column("created_at", timestamp, nullable=False, server_default=sa.func.now()),
     )
-    for column in (
+    for failure_index_name in (
         "harvest_job_id",
         "external_id",
         "error_type",
@@ -102,7 +105,11 @@ def upgrade() -> None:
         "resolved",
         "created_at",
     ):
-        op.create_index(f"ix_harvest_failures_{column}", "harvest_failures", [column])
+        op.create_index(
+            f"ix_harvest_failures_{failure_index_name}",
+            "harvest_failures",
+            [failure_index_name],
+        )
     op.create_table(
         "import_files",
         sa.Column("id", uuid, primary_key=True),
@@ -123,8 +130,8 @@ def upgrade() -> None:
         sa.Column("validation_status", sa.String(30), nullable=False, server_default="pending"),
         sa.Column("validation_errors", postgresql.JSONB(), nullable=False, server_default="[]"),
     )
-    for column in ("harvest_job_id", "checksum", "validation_status"):
-        op.create_index(f"ix_import_files_{column}", "import_files", [column])
+    for import_index_name in ("harvest_job_id", "checksum", "validation_status"):
+        op.create_index(f"ix_import_files_{import_index_name}", "import_files", [import_index_name])
 
 
 def downgrade() -> None:

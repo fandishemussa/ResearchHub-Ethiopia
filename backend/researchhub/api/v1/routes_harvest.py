@@ -29,7 +29,9 @@ router = APIRouter(
 
 
 @router.post(
-    "/jobs", response_model=HarvestJobRead, status_code=202,
+    "/jobs",
+    response_model=HarvestJobRead,
+    status_code=202,
     dependencies=[Depends(require_permission(Permissions.HARVEST_START))],
 )
 async def queue_harvest(
@@ -66,7 +68,8 @@ async def get_harvest_job(
 
 
 @router.post(
-    "/jobs/{job_id}/cancel", response_model=HarvestJobDetail,
+    "/jobs/{job_id}/cancel",
+    response_model=HarvestJobDetail,
     dependencies=[Depends(require_permission(Permissions.HARVEST_CANCEL))],
 )
 async def cancel_harvest_job(
@@ -94,7 +97,8 @@ async def _retry(
 
 
 @router.post(
-    "/jobs/{job_id}/retry", response_model=HarvestJobDetail,
+    "/jobs/{job_id}/retry",
+    response_model=HarvestJobDetail,
     status_code=status.HTTP_202_ACCEPTED,
     dependencies=[Depends(require_permission(Permissions.HARVEST_START))],
 )
@@ -117,7 +121,8 @@ async def retry_failed_harvest(
 
 
 @router.post(
-    "/jobs/{job_id}/resume", response_model=HarvestJobDetail,
+    "/jobs/{job_id}/resume",
+    response_model=HarvestJobDetail,
     status_code=status.HTTP_202_ACCEPTED,
     dependencies=[Depends(require_permission(Permissions.HARVEST_START))],
 )

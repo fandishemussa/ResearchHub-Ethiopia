@@ -84,9 +84,9 @@ class DSpaceDiscoveryConnector(OAIPMHConnector):
         while True:
             payload = await self._request_page(page_number, page_size)
             result = _search_result(payload)
-            objects = ((result.get("_embedded") or {}).get("objects") or [])
+            objects = (result.get("_embedded") or {}).get("objects") or []
             for wrapper in objects:
-                item = ((wrapper.get("_embedded") or {}).get("indexableObject") or {})
+                item = (wrapper.get("_embedded") or {}).get("indexableObject") or {}
                 if not item or item.get("type") != "item":
                     continue
                 raw = _raw_record(item, self.config)
@@ -157,7 +157,7 @@ def _discovery_endpoint(value: str) -> tuple[str, dict[str, str]]:
 
 
 def _search_result(payload: dict[str, Any]) -> dict[str, Any]:
-    result = ((payload.get("_embedded") or {}).get("searchResult") or {})
+    result = (payload.get("_embedded") or {}).get("searchResult") or {}
     if not isinstance(result, dict):
         raise ConnectorError("DSpace response is missing _embedded.searchResult")
     return result
@@ -202,8 +202,7 @@ def _metadata_values(metadata: dict[str, Any]) -> dict[str, list[str]]:
         cleaned = [
             str(value.get("value") if isinstance(value, dict) else value).strip()
             for value in values
-            if value is not None
-            and (not isinstance(value, dict) or value.get("value") is not None)
+            if value is not None and (not isinstance(value, dict) or value.get("value") is not None)
         ]
         cleaned = [value for value in cleaned if value]
         if key == "language":

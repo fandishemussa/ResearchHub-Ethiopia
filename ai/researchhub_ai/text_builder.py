@@ -41,11 +41,21 @@ class PublicationTextBuilder:
     def build_chatbot_document(self, publication: Any) -> BuiltPublicationText:
         return self._build(publication, include_abstract=True)
 
-    def _build(self, publication: Any, *, include_abstract: bool, repeat_title: bool = False) -> BuiltPublicationText:
+    def _build(
+        self, publication: Any, *, include_abstract: bool, repeat_title: bool = False
+    ) -> BuiltPublicationText:
         if getattr(publication, "is_deleted", False):
             raise ValueError("Deleted publications cannot be used for AI operations")
-        authors = [link.author.full_name for link in getattr(publication, "authors", []) if getattr(link, "author", None)]
-        keywords = [link.keyword.term for link in getattr(publication, "keywords", []) if getattr(link, "keyword", None)]
+        authors = [
+            link.author.full_name
+            for link in getattr(publication, "authors", [])
+            if getattr(link, "author", None)
+        ]
+        keywords = [
+            link.keyword.term
+            for link in getattr(publication, "keywords", [])
+            if getattr(link, "keyword", None)
+        ]
         journal = getattr(getattr(publication, "journal", None), "name", None)
         values: list[tuple[str, Any]] = [
             ("Title", getattr(publication, "title", None)),
@@ -77,7 +87,11 @@ class PublicationTextBuilder:
         text = "\n\n".join(sections)[: self.max_characters].rstrip()
         if not text:
             raise ValueError("Publication contains no usable AI text")
-        return BuiltPublicationText(text=text, content_hash=sha256(text.encode("utf-8")).hexdigest(), source_fields=tuple(fields))
+        return BuiltPublicationText(
+            text=text,
+            content_hash=sha256(text.encode("utf-8")).hexdigest(),
+            source_fields=tuple(fields),
+        )
 
 
 def clean_ai_text(value: str) -> str:

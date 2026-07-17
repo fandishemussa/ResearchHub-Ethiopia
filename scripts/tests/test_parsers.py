@@ -20,17 +20,17 @@ class FakeClient:
 
 
 def test_safe_filename():
-    assert safe_filename('A: bad/file?') == 'A_ bad_file_'
+    assert safe_filename("A: bad/file?") == "A_ bad_file_"
 
 
 def test_pdf_magic():
-    assert looks_like_pdf(b'%PDF-1.7', None)
+    assert looks_like_pdf(b"%PDF-1.7", None)
 
 
 def test_oai_parse_first_record():
-    content = Path('tests/fixtures/oai_page.xml').read_bytes()
+    content = Path("tests/fixtures/oai_page.xml").read_bytes()
     client = FakeClient(content)
-    records = list(iter_oai_publications(client, SOURCES['bdu'], max_records=1))
+    records = list(iter_oai_publications(client, SOURCES["bdu"], max_records=1))
     assert len(records) == 1
-    assert records[0].title == 'Example Thesis'
-    assert records[0].landing_url.endswith('/123456789/4991')
+    assert records[0].title == "Example Thesis"
+    assert records[0].landing_url.endswith("/123456789/4991")

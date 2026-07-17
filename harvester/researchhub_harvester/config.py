@@ -116,10 +116,7 @@ def load_harvest_config(source: str | Path | dict[str, Any]) -> HarvestEngineCon
     """Load harvest engine configuration from a JSON file path or dictionary."""
 
     payload = _read_config_payload(source)
-    connectors = [
-        _parse_connector_definition(item)
-        for item in payload.get("connectors", [])
-    ]
+    connectors = [_parse_connector_definition(item) for item in payload.get("connectors", [])]
     return HarvestEngineConfig(
         connectors=connectors,
         max_concurrent_connectors=int(payload.get("max_concurrent_connectors", 3)),
@@ -135,7 +132,10 @@ def _read_config_payload(source: str | Path | dict[str, Any]) -> dict[str, Any]:
         return source
     path = Path(source)
     with path.open("r", encoding="utf-8") as file:
-        return json.load(file)
+        payload: object = json.load(file)
+    if not isinstance(payload, dict):
+        raise ValueError("Harvest configuration must be a JSON object")
+    return {str(key): value for key, value in payload.items()}
 
 
 def _parse_connector_definition(payload: dict[str, Any]) -> HarvestConnectorDefinition:
@@ -187,4 +187,3 @@ def _parse_uuid(value: Any) -> UUID | None:
     if isinstance(value, UUID):
         return value
     return UUID(str(value))
-

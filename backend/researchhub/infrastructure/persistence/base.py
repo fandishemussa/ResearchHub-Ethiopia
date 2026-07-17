@@ -16,4 +16,3 @@ class Base(DeclarativeBase):
     """Base class for every SQLAlchemy model in the platform."""
 
     metadata = MetaData(naming_convention=NAMING_CONVENTION)
-

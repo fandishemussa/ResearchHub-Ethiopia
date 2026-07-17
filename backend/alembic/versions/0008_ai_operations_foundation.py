@@ -35,9 +35,15 @@ def upgrade() -> None:
         sa.Column("updated_at", timestamp, nullable=False, server_default=sa.func.now()),
         sa.UniqueConstraint("publication_id", "model_name"),
     )
-    op.create_index("ix_publication_embeddings_publication_id", "publication_embeddings", ["publication_id"])
-    op.create_index("ix_publication_embeddings_model_name", "publication_embeddings", ["model_name"])
-    op.create_index("ix_publication_embeddings_content_hash", "publication_embeddings", ["content_hash"])
+    op.create_index(
+        "ix_publication_embeddings_publication_id", "publication_embeddings", ["publication_id"]
+    )
+    op.create_index(
+        "ix_publication_embeddings_model_name", "publication_embeddings", ["model_name"]
+    )
+    op.create_index(
+        "ix_publication_embeddings_content_hash", "publication_embeddings", ["content_hash"]
+    )
     op.create_index(
         "ix_publication_embeddings_vector_hnsw",
         "publication_embeddings",
@@ -46,9 +52,18 @@ def upgrade() -> None:
         postgresql_ops={"embedding": "vector_cosine_ops"},
     )
 
-    op.add_column("publication_summaries", sa.Column("language", sa.String(20), nullable=False, server_default="en"))
-    op.add_column("publication_summaries", sa.Column("source_type", sa.String(30), nullable=False, server_default="metadata"))
-    op.add_column("publication_summaries", sa.Column("model_provider", sa.String(40), nullable=False, server_default="local"))
+    op.add_column(
+        "publication_summaries",
+        sa.Column("language", sa.String(20), nullable=False, server_default="en"),
+    )
+    op.add_column(
+        "publication_summaries",
+        sa.Column("source_type", sa.String(30), nullable=False, server_default="metadata"),
+    )
+    op.add_column(
+        "publication_summaries",
+        sa.Column("model_provider", sa.String(40), nullable=False, server_default="local"),
+    )
     op.add_column("publication_summaries", sa.Column("verified_by", uuid))
     op.add_column("publication_summaries", sa.Column("verified_at", timestamp))
     op.add_column("publication_summaries", sa.Column("edited_text", sa.Text()))
@@ -68,13 +83,19 @@ def upgrade() -> None:
         sa.Column("trend_score", sa.Numeric(10, 4), nullable=False, server_default="0"),
         sa.Column("confidence_score", sa.Numeric(5, 4), nullable=False, server_default="0"),
         sa.Column("methodology", sa.Text(), nullable=False),
-        sa.Column("supporting_publication_ids", postgresql.JSONB(), nullable=False, server_default="[]"),
+        sa.Column(
+            "supporting_publication_ids", postgresql.JSONB(), nullable=False, server_default="[]"
+        ),
         sa.Column("metadata", postgresql.JSONB(), nullable=False, server_default="{}"),
         sa.Column("generated_at", timestamp, nullable=False, server_default=sa.func.now()),
     )
     for column in ("scope_type", "scope_id", "trend_type", "label", "period_start", "period_end"):
         op.create_index(f"ix_research_trends_{column}", "research_trends", [column])
-    op.create_index("ix_research_trends_scope_period", "research_trends", ["scope_type", "scope_id", "period_start", "period_end"])
+    op.create_index(
+        "ix_research_trends_scope_period",
+        "research_trends",
+        ["scope_type", "scope_id", "period_start", "period_end"],
+    )
 
     op.create_table(
         "ai_jobs",
@@ -125,6 +146,13 @@ def downgrade() -> None:
     op.drop_table("ai_usage_logs")
     op.drop_table("ai_jobs")
     op.drop_table("research_trends")
-    for column in ("edited_text", "verified_at", "verified_by", "model_provider", "source_type", "language"):
+    for column in (
+        "edited_text",
+        "verified_at",
+        "verified_by",
+        "model_provider",
+        "source_type",
+        "language",
+    ):
         op.drop_column("publication_summaries", column)
     op.drop_table("publication_embeddings")

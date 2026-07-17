@@ -19,10 +19,7 @@ LOGGER = logging.getLogger(__name__)
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description=(
-            "Extract and index downloaded research PDFs "
-            "into PostgreSQL and pgvector."
-        )
+        description=("Extract and index downloaded research PDFs into PostgreSQL and pgvector.")
     )
 
     parser.add_argument(
@@ -53,22 +50,15 @@ def parse_args() -> argparse.Namespace:
 
 
 def load_manifest(
-        source_directory: Path,
+    source_directory: Path,
 ) -> dict[str, dict[str, Any]]:
-    manifest_path = (
-            source_directory
-            / "manifest.json"
-    )
+    manifest_path = source_directory / "manifest.json"
 
     if not manifest_path.exists():
         return {}
 
     try:
-        payload = json.loads(
-            manifest_path.read_text(
-                encoding="utf-8"
-            )
-        )
+        payload = json.loads(manifest_path.read_text(encoding="utf-8"))
     except Exception as exc:
         LOGGER.warning(
             "Could not read manifest %s: %s",
@@ -79,10 +69,7 @@ def load_manifest(
 
     if isinstance(payload, dict):
         records = (
-                payload.get("documents")
-                or payload.get("items")
-                or payload.get("entries")
-                or payload
+            payload.get("documents") or payload.get("items") or payload.get("entries") or payload
         )
     else:
         records = payload
@@ -100,16 +87,10 @@ def load_manifest(
         if not isinstance(record, dict):
             continue
 
-        path_value = (
-                record.get("local_path")
-                or record.get("path")
-                or record.get("final_path")
-        )
+        path_value = record.get("local_path") or record.get("path") or record.get("final_path")
 
         if path_value:
-            by_path[
-                Path(str(path_value)).name
-            ] = record
+            by_path[Path(str(path_value)).name] = record
 
     return by_path
 
@@ -119,11 +100,7 @@ async def run() -> int:
 
     root = Path(args.input_dir)
 
-    sources = (
-        ["aau", "wku", "bdu"]
-        if args.source == "all"
-        else [args.source]
-    )
+    sources = ["aau", "wku", "bdu"] if args.source == "all" else [args.source]
 
     indexed = 0
     skipped = 0
@@ -139,21 +116,12 @@ async def run() -> int:
             )
             continue
 
-        manifest = load_manifest(
-            source_directory
-        )
+        manifest = load_manifest(source_directory)
 
-        pdf_paths = sorted(
-            path
-            for path in source_directory.rglob("*.pdf")
-            if path.is_file()
-        )
+        pdf_paths = sorted(path for path in source_directory.rglob("*.pdf") if path.is_file())
 
         for path in pdf_paths:
-            if (
-                    args.limit is not None
-                    and indexed >= args.limit
-            ):
+            if args.limit is not None and indexed >= args.limit:
                 print(
                     {
                         "indexed": indexed,
@@ -175,16 +143,9 @@ async def run() -> int:
                         path=path,
                         source=source,
                         title=record.get("title"),
-                        external_id=(
-                                record.get("external_id")
-                                or record.get("publication_id")
-                        ),
-                        document_url=record.get(
-                            "document_url"
-                        ),
-                        landing_url=record.get(
-                            "landing_url"
-                        ),
+                        external_id=(record.get("external_id") or record.get("publication_id")),
+                        document_url=record.get("document_url"),
+                        landing_url=record.get("landing_url"),
                         metadata=record,
                     )
 
@@ -221,10 +182,7 @@ async def run() -> int:
 def main() -> int:
     logging.basicConfig(
         level=logging.INFO,
-        format=(
-            "%(asctime)s %(levelname)s "
-            "%(name)s: %(message)s"
-        ),
+        format=("%(asctime)s %(levelname)s %(name)s: %(message)s"),
     )
 
     return asyncio.run(run())

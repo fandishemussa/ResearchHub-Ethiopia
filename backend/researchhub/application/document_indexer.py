@@ -127,7 +127,7 @@ def clean_text(value: str) -> str:
 def extract_pdf_pages(path: Path) -> list[ExtractedPage]:
     pages: list[ExtractedPage] = []
 
-    with fitz.open(path) as document:
+    with fitz.open(str(path)) as document:
         for page_number, page in enumerate(
             document,
             start=1,

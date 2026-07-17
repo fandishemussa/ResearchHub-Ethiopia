@@ -15,7 +15,8 @@ from researchhub.domain.schemas import (
     QualityReportRead,
     QualitySummaryRead,
 )
-from researchhub.infrastructure.persistence.repositories import QualityReportFilters
+from researchhub.infrastructure.persistence.models import QualityReport
+from researchhub.infrastructure.persistence.repositories import Page, QualityReportFilters
 
 router = APIRouter(
     prefix="/quality",
@@ -55,7 +56,7 @@ def _quality_filters(
     )
 
 
-def _report_page_response(page) -> QualityReportPage:
+def _report_page_response(page: Page[QualityReport]) -> QualityReportPage:
     """Convert a repository page to the public response schema."""
 
     return QualityReportPage(

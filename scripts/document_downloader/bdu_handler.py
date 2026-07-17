@@ -27,10 +27,7 @@ SUPPORTED_MIME_TYPES = {
 MIME_BY_EXTENSION = {
     ".pdf": "application/pdf",
     ".doc": "application/msword",
-    ".docx": (
-        "application/vnd.openxmlformats-officedocument."
-        "wordprocessingml.document"
-    ),
+    ".docx": ("application/vnd.openxmlformats-officedocument.wordprocessingml.document"),
 }
 
 
@@ -54,15 +51,15 @@ def _base_url(source: SourceConfig) -> str:
 
 
 def _rest_url(
-        source: SourceConfig,
-        path: str,
+    source: SourceConfig,
+    path: str,
 ) -> str:
     return f"{_base_url(source)}/rest/{path.lstrip('/')}"
 
 
 def _repository_handle_url(
-        source: SourceConfig,
-        handle: str | None,
+    source: SourceConfig,
+    handle: str | None,
 ) -> str | None:
     if not handle:
         return None
@@ -70,11 +67,11 @@ def _repository_handle_url(
     cleaned = handle.strip()
 
     for prefix in (
-            "http://hdl.handle.net/",
-            "https://hdl.handle.net/",
+        "http://hdl.handle.net/",
+        "https://hdl.handle.net/",
     ):
         if cleaned.startswith(prefix):
-            cleaned = cleaned[len(prefix):]
+            cleaned = cleaned[len(prefix) :]
             break
 
     cleaned = cleaned.removeprefix("/handle/")
@@ -87,7 +84,7 @@ def _repository_handle_url(
 
 
 def _handle_from_uri(
-        value: str | None,
+    value: str | None,
 ) -> str | None:
     if not value:
         return None
@@ -95,11 +92,11 @@ def _handle_from_uri(
     cleaned = value.strip()
 
     for prefix in (
-            "http://hdl.handle.net/",
-            "https://hdl.handle.net/",
+        "http://hdl.handle.net/",
+        "https://hdl.handle.net/",
     ):
         if cleaned.startswith(prefix):
-            return cleaned[len(prefix):].strip("/")
+            return cleaned[len(prefix) :].strip("/")
 
     if "/handle/" in cleaned:
         return cleaned.split("/handle/", 1)[1].strip("/")
@@ -111,10 +108,11 @@ def _handle_from_uri(
 
 
 def _get_json(
-        client: ResilientHttpClient,
-        url: str,
-        *,
-        params: dict[str, Any] | None = None,) -> Any:
+    client: ResilientHttpClient,
+    url: str,
+    *,
+    params: dict[str, Any] | None = None,
+) -> Any:
     return client.get_json_value(
         url,
         params=params,
@@ -122,8 +120,10 @@ def _get_json(
             "Accept": "application/json",
         },
     )
+
+
 def _metadata_multimap(
-        rows: list[dict[str, Any]],
+    rows: list[dict[str, Any]],
 ) -> dict[str, list[str]]:
     values: dict[str, list[str]] = defaultdict(list)
 
@@ -138,8 +138,8 @@ def _metadata_multimap(
 
 
 def _first(
-        metadata: dict[str, list[str]],
-        *keys: str,
+    metadata: dict[str, list[str]],
+    *keys: str,
 ) -> str | None:
     for key in keys:
         values = metadata.get(key) or []
@@ -154,8 +154,8 @@ def _first(
 
 
 def _all_values(
-        metadata: dict[str, list[str]],
-        *keys: str,
+    metadata: dict[str, list[str]],
+    *keys: str,
 ) -> list[str]:
     result: list[str] = []
     seen: set[str] = set()
@@ -172,7 +172,7 @@ def _all_values(
 
 
 def normalize_bdu_metadata(
-        rows: list[dict[str, Any]],
+    rows: list[dict[str, Any]],
 ) -> dict[str, Any]:
     metadata = _metadata_multimap(rows)
 
@@ -236,12 +236,12 @@ def normalize_bdu_metadata(
 
 
 def _filename_from_bitstream(
-        bitstream: dict[str, Any],
+    bitstream: dict[str, Any],
 ) -> str | None:
     for key in (
-            "name",
-            "filename",
-            "fileName",
+        "name",
+        "filename",
+        "fileName",
     ):
         value = bitstream.get(key)
 
@@ -252,29 +252,24 @@ def _filename_from_bitstream(
 
 
 def _mime_from_bitstream(
-        bitstream: dict[str, Any],
+    bitstream: dict[str, Any],
 ) -> str | None:
     for key in (
-            "mimeType",
-            "mime_type",
-            "format",
-            "contentType",
+        "mimeType",
+        "mime_type",
+        "format",
+        "contentType",
     ):
         value = bitstream.get(key)
 
         if value:
-            return (
-                str(value)
-                .split(";", 1)[0]
-                .strip()
-                .lower()
-            )
+            return str(value).split(";", 1)[0].strip().lower()
 
     return None
 
 
 def _extension_from_filename(
-        filename: str | None,
+    filename: str | None,
 ) -> str | None:
     if not filename:
         return None
@@ -285,7 +280,7 @@ def _extension_from_filename(
 
 
 def _is_supported_bitstream(
-        bitstream: dict[str, Any],
+    bitstream: dict[str, Any],
 ) -> bool:
     filename = _filename_from_bitstream(bitstream)
     extension = _extension_from_filename(filename)
@@ -298,7 +293,7 @@ def _is_supported_bitstream(
 
 
 def _bitstream_id(
-        bitstream: dict[str, Any],
+    bitstream: dict[str, Any],
 ) -> str | None:
     value = bitstream.get("id")
 
@@ -312,16 +307,16 @@ def _bitstream_id(
 
 
 def _bitstream_download_url(
-        source: SourceConfig,
-        bitstream: dict[str, Any],
+    source: SourceConfig,
+    bitstream: dict[str, Any],
 ) -> str | None:
     base = _base_url(source)
 
     for key in (
-            "retrieveLink",
-            "retrieve",
-            "downloadLink",
-            "contentLink",
+        "retrieveLink",
+        "retrieve",
+        "downloadLink",
+        "contentLink",
     ):
         value = bitstream.get(key)
 
@@ -354,8 +349,8 @@ def _bitstream_download_url(
 
 
 def _bitstream_candidate(
-        source: SourceConfig,
-        bitstream: dict[str, Any],
+    source: SourceConfig,
+    bitstream: dict[str, Any],
 ) -> DocumentCandidate | None:
     if not _is_supported_bitstream(bitstream):
         return None
@@ -385,7 +380,7 @@ def _bitstream_candidate(
 
 
 def _deduplicate_candidates(
-        candidates: list[DocumentCandidate],
+    candidates: list[DocumentCandidate],
 ) -> list[DocumentCandidate]:
     result: list[DocumentCandidate] = []
     seen: set[str] = set()
@@ -406,19 +401,12 @@ def _deduplicate_candidates(
 
 
 def _sort_candidates(
-        candidates: list[DocumentCandidate],
+    candidates: list[DocumentCandidate],
 ) -> list[DocumentCandidate]:
     def priority(candidate: DocumentCandidate) -> tuple[int, str]:
-        filename = (
-                candidate.filename
-                or urlparse(candidate.url).path
-                or ""
-        ).lower()
+        filename = (candidate.filename or urlparse(candidate.url).path or "").lower()
 
-        mime_type = (
-                candidate.mime_type
-                or ""
-        ).lower()
+        mime_type = (candidate.mime_type or "").lower()
 
         if filename.endswith(".pdf") or mime_type == "application/pdf":
             return 0, filename
@@ -438,11 +426,11 @@ def _sort_candidates(
 
 
 def list_bdu_items(
-        client: ResilientHttpClient,
-        source: SourceConfig,
-        *,
-        limit: int,
-        offset: int,
+    client: ResilientHttpClient,
+    source: SourceConfig,
+    *,
+    limit: int,
+    offset: int,
 ) -> list[dict[str, Any]]:
     payload = _get_json(
         client,
@@ -455,21 +443,16 @@ def list_bdu_items(
 
     if not isinstance(payload, list):
         raise ValueError(
-            "BDU /rest/items returned an unexpected "
-            f"payload type: {type(payload).__name__}"
+            f"BDU /rest/items returned an unexpected payload type: {type(payload).__name__}"
         )
 
-    return [
-        item
-        for item in payload
-        if isinstance(item, dict)
-    ]
+    return [item for item in payload if isinstance(item, dict)]
 
 
 def get_bdu_item(
-        client: ResilientHttpClient,
-        source: SourceConfig,
-        item_id: str | int,
+    client: ResilientHttpClient,
+    source: SourceConfig,
+    item_id: str | int,
 ) -> dict[str, Any]:
     payload = _get_json(
         client,
@@ -481,17 +464,16 @@ def get_bdu_item(
 
     if not isinstance(payload, dict):
         raise ValueError(
-            "BDU item endpoint returned an unexpected "
-            f"payload type: {type(payload).__name__}"
+            f"BDU item endpoint returned an unexpected payload type: {type(payload).__name__}"
         )
 
     return payload
 
 
 def get_bdu_metadata(
-        client: ResilientHttpClient,
-        source: SourceConfig,
-        item_id: str | int,
+    client: ResilientHttpClient,
+    source: SourceConfig,
+    item_id: str | int,
 ) -> dict[str, Any]:
     payload = _get_json(
         client,
@@ -503,23 +485,18 @@ def get_bdu_metadata(
 
     if not isinstance(payload, list):
         raise ValueError(
-            "BDU metadata endpoint returned an unexpected "
-            f"payload type: {type(payload).__name__}"
+            f"BDU metadata endpoint returned an unexpected payload type: {type(payload).__name__}"
         )
 
-    rows = [
-        row
-        for row in payload
-        if isinstance(row, dict)
-    ]
+    rows = [row for row in payload if isinstance(row, dict)]
 
     return normalize_bdu_metadata(rows)
 
 
 def get_bdu_bitstreams(
-        client: ResilientHttpClient,
-        source: SourceConfig,
-        item_id: str | int,
+    client: ResilientHttpClient,
+    source: SourceConfig,
+    item_id: str | int,
 ) -> list[dict[str, Any]]:
     payload = _get_json(
         client,
@@ -531,32 +508,25 @@ def get_bdu_bitstreams(
 
     if not isinstance(payload, list):
         raise ValueError(
-            "BDU bitstreams endpoint returned an unexpected "
-            f"payload type: {type(payload).__name__}"
+            f"BDU bitstreams endpoint returned an unexpected payload type: {type(payload).__name__}"
         )
 
-    return [
-        bitstream
-        for bitstream in payload
-        if isinstance(bitstream, dict)
-    ]
+    return [bitstream for bitstream in payload if isinstance(bitstream, dict)]
 
 
 def iter_bdu_publications(
-        client: ResilientHttpClient,
-        source: SourceConfig,
-        *,
-        max_records: int | None,
-        from_date: str | None = None,
-        set_spec: str | None = None,
-        page_size: int = 100,
+    client: ResilientHttpClient,
+    source: SourceConfig,
+    *,
+    max_records: int | None,
+    from_date: str | None = None,
+    set_spec: str | None = None,
+    page_size: int = 100,
 ) -> Iterator[Publication]:
     del set_spec
 
     if page_size < 1:
-        raise ValueError(
-            "page_size must be greater than zero"
-        )
+        raise ValueError("page_size must be greater than zero")
 
     offset = 0
     yielded = 0
@@ -593,15 +563,10 @@ def iter_bdu_publications(
             if item_id is None:
                 continue
 
-            last_modified = str(
-                item.get("lastModified") or ""
-            ).strip()
+            last_modified = str(item.get("lastModified") or "").strip()
 
             if from_date and last_modified:
-                normalized_modified = (
-                    last_modified
-                    .replace(" ", "T")
-                )
+                normalized_modified = last_modified.replace(" ", "T")
 
                 if normalized_modified[:10] < from_date:
                     continue
@@ -620,10 +585,7 @@ def iter_bdu_publications(
                 )
                 metadata = {}
 
-            handle = (
-                    metadata.get("handle")
-                    or item.get("handle")
-            )
+            handle = metadata.get("handle") or item.get("handle")
 
             landing_url = _repository_handle_url(
                 source,
@@ -631,15 +593,9 @@ def iter_bdu_publications(
             )
 
             if not landing_url:
-                landing_url = (
-                    f"{_base_url(source)}/rest/items/{item_id}"
-                )
+                landing_url = f"{_base_url(source)}/rest/items/{item_id}"
 
-            title = (
-                    metadata.get("title")
-                    or item.get("name")
-                    or f"BDU item {item_id}"
-            )
+            title = metadata.get("title") or item.get("name") or f"BDU item {item_id}"
 
             # For BDU, item_uuid stores the numeric legacy REST item ID.
             # This avoids changing the existing Publication model.
@@ -660,19 +616,13 @@ def iter_bdu_publications(
                 metadata={
                     "repository": "BDU",
                     "legacy_rest_item_id": str(item_id),
-                    "handle": (
-                        str(handle)
-                        if handle
-                        else None
-                    ),
+                    "handle": (str(handle) if handle else None),
                     "authors": metadata.get("authors", []),
                     "abstract": metadata.get("abstract"),
                     "subjects": metadata.get("subjects", []),
                     "issued": metadata.get("issued"),
                     "language": metadata.get("language"),
-                    "document_type": metadata.get(
-                        "document_type"
-                    ),
+                    "document_type": metadata.get("document_type"),
                     "publisher": metadata.get("publisher"),
                     "last_modified": last_modified or None,
                     "raw_metadata": metadata.get(
@@ -692,44 +642,36 @@ def iter_bdu_publications(
 
 
 def _item_id_from_publication(
-        publication: Publication,
+    publication: Publication,
 ) -> str | None:
     if publication.item_uuid:
         return str(publication.item_uuid)
 
-    external_id = str(
-        publication.external_id
-        or ""
-    )
+    external_id = str(publication.external_id or "")
 
     if external_id.startswith("bdu:"):
         return external_id.split(":", 1)[1]
 
-    metadata = getattr(
-        publication,
-        "metadata",
-        {},
-    ) or {}
-
-    item_id = metadata.get(
-        "legacy_rest_item_id"
+    metadata = (
+        getattr(
+            publication,
+            "metadata",
+            {},
+        )
+        or {}
     )
 
-    return (
-        str(item_id)
-        if item_id is not None
-        else None
-    )
+    item_id = metadata.get("legacy_rest_item_id")
+
+    return str(item_id) if item_id is not None else None
 
 
 def discover_bdu_rest_documents(
-        client: ResilientHttpClient,
-        source: SourceConfig,
-        publication: Publication,
+    client: ResilientHttpClient,
+    source: SourceConfig,
+    publication: Publication,
 ) -> list[DocumentCandidate]:
-    item_id = _item_id_from_publication(
-        publication
-    )
+    item_id = _item_id_from_publication(publication)
 
     if not item_id:
         return []
@@ -751,12 +693,14 @@ def discover_bdu_rest_documents(
         if candidate:
             candidates.append(candidate)
 
-    return _sort_candidates(
-        _deduplicate_candidates(candidates)
-    )
+    return _sort_candidates(_deduplicate_candidates(candidates))
 
 
-def discover_bdu_html_documents(client: ResilientHttpClient,source: SourceConfig,publication: Publication,) -> list[DocumentCandidate]:
+def discover_bdu_html_documents(
+    client: ResilientHttpClient,
+    source: SourceConfig,
+    publication: Publication,
+) -> list[DocumentCandidate]:
     """
     HTML fallback is currently disabled.
 
@@ -771,9 +715,9 @@ def discover_bdu_html_documents(client: ResilientHttpClient,source: SourceConfig
 
 
 def discover_bdu_documents(
-        client: ResilientHttpClient,
-        source: SourceConfig,
-        publication: Publication,
+    client: ResilientHttpClient,
+    source: SourceConfig,
+    publication: Publication,
 ) -> list[DocumentCandidate]:
     candidates: list[DocumentCandidate] = []
 
@@ -806,6 +750,4 @@ def discover_bdu_documents(
             )
         )
 
-    return _sort_candidates(
-        _deduplicate_candidates(candidates)
-    )
+    return _sort_candidates(_deduplicate_candidates(candidates))

@@ -56,9 +56,7 @@ def test_missing_title_is_rejected() -> None:
 
 
 def test_bulk_import_skips_invalid_rows_instead_of_rejecting_file() -> None:
-    payload = json.dumps(
-        [{"title": "Valid record"}, {"external_id": "missing-title"}]
-    ).encode()
+    payload = json.dumps([{"title": "Valid record"}, {"external_id": "missing-title"}]).encode()
     records, errors, total = _parse_records_with_errors(payload, "json", source())
     assert total == 2
     assert [record.title for record in records] == ["Valid record"]

@@ -1,4 +1,3 @@
-
 from document_downloader.bdu_handler import rewrite_bdu_url
 from document_downloader.config import SOURCES
 from document_downloader.html_discovery import _is_supported_document_url
@@ -20,7 +19,12 @@ def test_supported_document_urls():
 
 def test_document_signatures():
     assert detect_document_extension(url="x", content_type=None, first_bytes=b"%PDF-1.7") == ".pdf"
-    assert detect_document_extension(url="x", content_type=None, first_bytes=b"PK\x03\x04") == ".docx"
-    assert detect_document_extension(
-        url="x", content_type=None, first_bytes=bytes.fromhex("D0CF11E0A1B11AE1")
-    ) == ".doc"
+    assert (
+        detect_document_extension(url="x", content_type=None, first_bytes=b"PK\x03\x04") == ".docx"
+    )
+    assert (
+        detect_document_extension(
+            url="x", content_type=None, first_bytes=bytes.fromhex("D0CF11E0A1B11AE1")
+        )
+        == ".doc"
+    )

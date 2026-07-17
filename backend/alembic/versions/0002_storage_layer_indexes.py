@@ -57,4 +57,3 @@ def downgrade() -> None:
     op.drop_index("ix_publications_source_external_deleted", table_name="publications")
     op.drop_index("ix_publications_repo_year_lang_deleted", table_name="publications")
     op.drop_index("ix_repositories_university_platform_active", table_name="repositories")
-

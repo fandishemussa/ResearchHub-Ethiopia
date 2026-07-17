@@ -75,9 +75,7 @@ class AuthenticationService:
     ) -> tuple[User, str, str, datetime]:
         token_hash = hash_token(token)
         refresh_session = await self.session.scalar(
-            select(RefreshSession)
-            .where(RefreshSession.token_hash == token_hash)
-            .with_for_update()
+            select(RefreshSession).where(RefreshSession.token_hash == token_hash).with_for_update()
         )
         now = datetime.now(UTC)
         if refresh_session is None:
@@ -194,9 +192,9 @@ class AuthenticationService:
 
     async def verify_email(self, token: str) -> None:
         item = await self.session.scalar(
-            select(EmailVerificationToken).where(
-                EmailVerificationToken.token_hash == hash_token(token)
-            ).with_for_update()
+            select(EmailVerificationToken)
+            .where(EmailVerificationToken.token_hash == hash_token(token))
+            .with_for_update()
         )
         now = datetime.now(UTC)
         if item is None or item.used_at is not None or _as_utc(item.expires_at) <= now:

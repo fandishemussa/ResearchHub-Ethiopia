@@ -91,16 +91,10 @@ class ManifestManager:
                 OSError,
                 json.JSONDecodeError,
             ):
-                backup_path = (
-                    self.manifest_path.with_suffix(
-                        ".corrupted.json"
-                    )
-                )
+                backup_path = self.manifest_path.with_suffix(".corrupted.json")
 
                 with suppress(OSError):
-                    self.manifest_path.replace(
-                        backup_path
-                    )
+                    self.manifest_path.replace(backup_path)
 
         now = utc_now()
 
@@ -165,9 +159,7 @@ class ManifestManager:
         )
 
         with self.lock:
-            index = self._find_document_index(
-                document_id
-            )
+            index = self._find_document_index(document_id)
 
             now = utc_now()
 
@@ -185,9 +177,7 @@ class ManifestManager:
                         "filename": filename,
                         "document_type": document_type,
                         "mime_type": mime_type,
-                        "expected_size_bytes": (
-                            expected_size_bytes
-                        ),
+                        "expected_size_bytes": (expected_size_bytes),
                         "downloaded_size_bytes": 0,
                         "progress_percent": 0.0,
                         "status": "discovered",
@@ -206,45 +196,17 @@ class ManifestManager:
                 )
 
             else:
-                document = self.data[
-                    "documents"
-                ][index]
+                document = self.data["documents"][index]
 
                 document.update(
                     {
-                        "title": (
-                            title
-                            or document.get("title")
-                        ),
-                        "landing_url": (
-                            landing_url
-                            or document.get(
-                                "landing_url"
-                            )
-                        ),
-                        "filename": (
-                            filename
-                            or document.get(
-                                "filename"
-                            )
-                        ),
-                        "document_type": (
-                            document_type
-                            or document.get(
-                                "document_type"
-                            )
-                        ),
-                        "mime_type": (
-                            mime_type
-                            or document.get(
-                                "mime_type"
-                            )
-                        ),
+                        "title": (title or document.get("title")),
+                        "landing_url": (landing_url or document.get("landing_url")),
+                        "filename": (filename or document.get("filename")),
+                        "document_type": (document_type or document.get("document_type")),
+                        "mime_type": (mime_type or document.get("mime_type")),
                         "expected_size_bytes": (
-                            expected_size_bytes
-                            or document.get(
-                                "expected_size_bytes"
-                            )
+                            expected_size_bytes or document.get("expected_size_bytes")
                         ),
                         "authors": (
                             authors
@@ -253,12 +215,7 @@ class ManifestManager:
                                 [],
                             )
                         ),
-                        "issued_date": (
-                            issued_date
-                            or document.get(
-                                "issued_date"
-                            )
-                        ),
+                        "issued_date": (issued_date or document.get("issued_date")),
                         "updated_at": now,
                     }
                 )
@@ -273,24 +230,18 @@ class ManifestManager:
         **changes: Any,
     ) -> None:
         with self.lock:
-            index = self._find_document_index(
-                document_id
-            )
+            index = self._find_document_index(document_id)
 
             if index is None:
                 return
 
-            document = self.data[
-                "documents"
-            ][index]
+            document = self.data["documents"][index]
 
             changes["updated_at"] = utc_now()
 
             document.update(changes)
 
-            expected_size = document.get(
-                "expected_size_bytes"
-            )
+            expected_size = document.get("expected_size_bytes")
             downloaded_size = document.get(
                 "downloaded_size_bytes",
                 0,
@@ -303,11 +254,7 @@ class ManifestManager:
             ):
                 progress = min(
                     100.0,
-                    (
-                        downloaded_size
-                        / expected_size
-                    )
-                    * 100.0,
+                    (downloaded_size / expected_size) * 100.0,
                 )
 
                 document["progress_percent"] = round(
@@ -329,36 +276,23 @@ class ManifestManager:
         now = utc_now()
 
         with self.lock:
-            index = self._find_document_index(
-                document_id
-            )
+            index = self._find_document_index(document_id)
 
             if index is None:
                 return
 
-            document = self.data[
-                "documents"
-            ][index]
+            document = self.data["documents"][index]
 
-            if not document.get(
-                "download_started_at"
-            ):
-                document[
-                    "download_started_at"
-                ] = now
+            if not document.get("download_started_at"):
+                document["download_started_at"] = now
 
             document.update(
                 {
                     "status": "downloading",
                     "partial_path": partial_path,
-                    "downloaded_size_bytes": (
-                        downloaded_size_bytes
-                    ),
+                    "downloaded_size_bytes": (downloaded_size_bytes),
                     "expected_size_bytes": (
-                        expected_size_bytes
-                        or document.get(
-                            "expected_size_bytes"
-                        )
+                        expected_size_bytes or document.get("expected_size_bytes")
                     ),
                     "retry_count": retry_count,
                     "last_attempt_at": now,
@@ -367,22 +301,13 @@ class ManifestManager:
                 }
             )
 
-            expected = document.get(
-                "expected_size_bytes"
-            )
+            expected = document.get("expected_size_bytes")
 
-            if (
-                isinstance(expected, int)
-                and expected > 0
-            ):
-                document[
-                    "progress_percent"
-                ] = round(
+            if isinstance(expected, int) and expected > 0:
+                document["progress_percent"] = round(
                     min(
                         100.0,
-                        downloaded_size_bytes
-                        / expected
-                        * 100.0,
+                        downloaded_size_bytes / expected * 100.0,
                     ),
                     2,
                 )
@@ -427,9 +352,7 @@ class ManifestManager:
             document_id,
             status="failed",
             message=message,
-            downloaded_size_bytes=(
-                downloaded_size_bytes
-            ),
+            downloaded_size_bytes=(downloaded_size_bytes),
             partial_path=partial_path,
             retry_count=retry_count,
         )
@@ -503,9 +426,7 @@ class ManifestManager:
             )
 
             if isinstance(downloaded_size, int):
-                statistics[
-                    "total_downloaded_bytes"
-                ] += downloaded_size
+                statistics["total_downloaded_bytes"] += downloaded_size
 
         target["statistics"] = statistics
 
@@ -513,11 +434,7 @@ class ManifestManager:
         self._refresh_statistics()
         self.data["updated_at"] = utc_now()
 
-        temporary_path = (
-            self.manifest_path.with_suffix(
-                ".json.tmp"
-            )
-        )
+        temporary_path = self.manifest_path.with_suffix(".json.tmp")
 
         with temporary_path.open(
             "w",
@@ -533,9 +450,7 @@ class ManifestManager:
             file.flush()
             os.fsync(file.fileno())
 
-        temporary_path.replace(
-            self.manifest_path
-        )
+        temporary_path.replace(self.manifest_path)
 
     def save(self) -> None:
         with self.lock:

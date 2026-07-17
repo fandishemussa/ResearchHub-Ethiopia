@@ -303,8 +303,8 @@ def _parse_records_with_errors(
     content: bytes, file_format: str, source: Connector
 ) -> tuple[list[NormalizedPublication], list[dict[str, Any]], int]:
     if file_format == "xml":
-        records = _parse_records(content, file_format, source)
-        return records, [], len(records)
+        xml_records = _parse_records(content, file_format, source)
+        return xml_records, [], len(xml_records)
     text = content.decode("utf-8-sig")
     if file_format == "json":
         payload = json.loads(text)
@@ -335,7 +335,8 @@ def _parse_records_with_errors(
 
 
 def _normalize_mapping(row: dict[str, Any], source: Connector) -> NormalizedPublication:
-    metadata = row.get("metadata") if isinstance(row.get("metadata"), dict) else {}
+    metadata_value = row.get("metadata")
+    metadata: dict[str, Any] = metadata_value if isinstance(metadata_value, dict) else {}
 
     def raw_values(*keys: str) -> list[str]:
         for key in keys:
@@ -384,6 +385,10 @@ def _normalize_mapping(row: dict[str, Any], source: Connector) -> NormalizedPubl
             item.strip() for item in str(value or "").replace(";", ",").split(",") if item.strip()
         ]
 
+    def first_value(*keys: str) -> str | None:
+        candidates = raw_values(*keys)
+        return candidates[0] if candidates else None
+
     date_values = raw_values("publication_year", "year", "publication_date", "dc.date.issued")
     year_text = date_values[0] if date_values else ""
     year = int(year_text[:4]) if year_text[:4].isdigit() else None
@@ -397,19 +402,17 @@ def _normalize_mapping(row: dict[str, Any], source: Connector) -> NormalizedPubl
         ).strip()
         or None,
         title=title,
-        abstract=(raw_values("abstract", "dc.description.abstract") or [None])[0],
+        abstract=first_value("abstract", "dc.description.abstract"),
         authors=values("authors"),
         affiliations=values("affiliations"),
         journal=str(row.get("journal") or row.get("journal_name") or "").strip() or None,
-        publisher=(raw_values("publisher", "dc.publisher") or [None])[0],
+        publisher=first_value("publisher", "dc.publisher"),
         publication_date=date(year, 1, 1) if year else None,
         publication_year=year,
         keywords=values("keywords") or values("subjects"),
         subjects=values("subjects"),
-        language=(raw_values("language", "languages", "dc.language", "dc.language.iso") or [None])[
-            0
-        ],
-        doi=(raw_values("doi", "dc.identifier.doi") or [None])[0],
+        language=first_value("language", "languages", "dc.language", "dc.language.iso"),
+        doi=first_value("doi", "dc.identifier.doi"),
         orcid=None,
         issn=None,
         isbn=None,

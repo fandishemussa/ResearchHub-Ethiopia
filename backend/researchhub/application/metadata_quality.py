@@ -329,7 +329,9 @@ class MetadataQualityService:
     ) -> Page[QualityReport]:
         """Return a filtered page of current quality reports."""
 
-        return await self.reports.paginate(filters or QualityReportFilters(), limit=limit, offset=offset)
+        return await self.reports.paginate(
+            filters or QualityReportFilters(), limit=limit, offset=offset
+        )
 
     async def low_quality_reports(
         self,
@@ -504,7 +506,9 @@ class MetadataQualityService:
             ),
             _check(bool(publication.repository_identifier), "repository_identifier", collector),
             _check(bool(publication.external_id), "external_id", collector),
-            _check(bool(publication.source and publication.source_type), "source_provenance", collector),
+            _check(
+                bool(publication.source and publication.source_type), "source_provenance", collector
+            ),
             _check(bool(publication.raw_record), "raw_metadata", collector),
         ]
         return _score_checks(checks)
@@ -563,7 +567,9 @@ class MetadataQualityService:
     def _score_timeliness(self, publication: Publication, collector: _IssueCollector) -> Decimal:
         checks = [
             _timestamp_not_future("harvested_at", publication.harvested_at, collector),
-            _timestamp_not_future("repository_datestamp", publication.repository_datestamp, collector),
+            _timestamp_not_future(
+                "repository_datestamp", publication.repository_datestamp, collector
+            ),
             _repository_datestamp_before_harvest(publication, collector),
             _publication_year_not_future(publication, collector),
             _harvest_not_stale(publication, collector),
@@ -732,7 +738,9 @@ def _publication_year_valid(publication: Publication, collector: _IssueCollector
         return False
     current_year = datetime.now(UTC).year
     if year < 1800 or year > current_year + 1:
-        collector.add_error("invalid_publication_year", f"Publication year is unreasonable: {year}.")
+        collector.add_error(
+            "invalid_publication_year", f"Publication year is unreasonable: {year}."
+        )
         return False
     return True
 
@@ -743,7 +751,9 @@ def _publication_year_not_future(publication: Publication, collector: _IssueColl
         return False
     current_year = datetime.now(UTC).year
     if year > current_year + 1:
-        collector.add_error("future_publication_year", f"Publication year is in the future: {year}.")
+        collector.add_error(
+            "future_publication_year", f"Publication year is in the future: {year}."
+        )
         return False
     return True
 

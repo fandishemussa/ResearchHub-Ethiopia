@@ -87,9 +87,7 @@ class ResilientHttpClient:
                     503,
                     504,
                 }:
-                    retry_after = response.headers.get(
-                        "Retry-After"
-                    )
+                    retry_after = response.headers.get("Retry-After")
 
                     if retry_after and retry_after.isdigit():
                         wait = float(retry_after)
@@ -131,9 +129,7 @@ class ResilientHttpClient:
                 ) + random.uniform(0, 1)
 
                 LOGGER.warning(
-                    "Request failed for %s "
-                    "(attempt %s/%s): %s; "
-                    "retrying in %.1fs",
+                    "Request failed for %s (attempt %s/%s): %s; retrying in %.1fs",
                     url,
                     attempt,
                     self.retries,
@@ -143,10 +139,7 @@ class ResilientHttpClient:
 
                 time.sleep(wait)
 
-        raise RuntimeError(
-            f"Request failed after {self.retries} attempts: "
-            f"{url}: {last_error}"
-        )
+        raise RuntimeError(f"Request failed after {self.retries} attempts: {url}: {last_error}")
 
     def get_json(
         self,
@@ -155,12 +148,7 @@ class ResilientHttpClient:
     ) -> dict[str, Any]:
         headers = kwargs.pop(
             "headers",
-            {
-                "Accept": (
-                    "application/hal+json,"
-                    "application/json"
-                )
-            },
+            {"Accept": ("application/hal+json,application/json")},
         )
 
         response = self.request(
@@ -176,23 +164,18 @@ class ResilientHttpClient:
             response.close()
 
         if not isinstance(data, dict):
-            raise RuntimeError(
-                f"Expected JSON object from {url}"
-            )
+            raise RuntimeError(f"Expected JSON object from {url}")
 
         return data
+
     def get_json_value(
-            self,
-            url: str,
-            **kwargs: Any,) -> Any:
+        self,
+        url: str,
+        **kwargs: Any,
+    ) -> Any:
         headers = kwargs.pop(
             "headers",
-            {
-                "Accept": (
-                    "application/hal+json,"
-                    "application/json"
-                )
-            },
+            {"Accept": ("application/hal+json,application/json")},
         )
 
         response = self.request(
@@ -205,11 +188,10 @@ class ResilientHttpClient:
         try:
             return response.json()
         except ValueError as exc:
-            raise RuntimeError(
-                f"Invalid JSON response from {url}"
-            ) from exc
+            raise RuntimeError(f"Invalid JSON response from {url}") from exc
         finally:
             response.close()
+
     def stream(
         self,
         url: str,

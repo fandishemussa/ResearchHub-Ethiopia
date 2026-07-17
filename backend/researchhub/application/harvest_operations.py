@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import builtins
 from datetime import UTC, datetime
 from uuid import UUID
 
@@ -59,9 +60,7 @@ class HarvestOperationsService:
             raise RuntimeError("A harvest is already active for this source")
         global_active = int(
             await self.session.scalar(
-                select(func.count(HarvestJob.id)).where(
-                    HarvestJob.status.in_(ACTIVE_STATUSES)
-                )
+                select(func.count(HarvestJob.id)).where(HarvestJob.status.in_(ACTIVE_STATUSES))
             )
             or 0
         )
@@ -167,7 +166,7 @@ class HarvestOperationsService:
         await self.session.refresh(job)
         return job
 
-    async def events(self, job_id: UUID) -> list[HarvestLog]:
+    async def events(self, job_id: UUID) -> builtins.list[HarvestLog]:
         if await self.get(job_id) is None:
             raise LookupError("Harvest job not found")
         return list(
@@ -180,7 +179,7 @@ class HarvestOperationsService:
             ).all()
         )
 
-    async def failures(self, job_id: UUID) -> list[HarvestFailure]:
+    async def failures(self, job_id: UUID) -> builtins.list[HarvestFailure]:
         if await self.get(job_id) is None:
             raise LookupError("Harvest job not found")
         return list(

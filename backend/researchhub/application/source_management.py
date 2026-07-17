@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import builtins
 from datetime import UTC, datetime
 from time import perf_counter
 from typing import Any
@@ -42,7 +43,7 @@ class SourceManagementService:
         university_id: UUID | None = None,
         limit: int = 100,
         offset: int = 0,
-    ) -> list[Connector]:
+    ) -> builtins.list[Connector]:
         statement = select(Connector).where(Connector.status != "removed")
         if source_type:
             statement = statement.where(Connector.connector_type == source_type)
@@ -124,9 +125,9 @@ class SourceManagementService:
         prospective_endpoint = values.get("oai_endpoint", source.oai_endpoint)
         if source.connector_type in OAI_TYPES and prospective_endpoint is None:
             raise ValueError("An OAI endpoint is required for this source type")
-        prospective_discovery_endpoint = values.get(
-            "api_url", source.api_url
-        ) or values.get("base_url", source.base_url)
+        prospective_discovery_endpoint = values.get("api_url", source.api_url) or values.get(
+            "base_url", source.base_url
+        )
         if source.connector_type in DISCOVERY_TYPES and prospective_discovery_endpoint is None:
             raise ValueError("A DSpace REST API endpoint is required for this source type")
         if prospective_endpoint is not None:
@@ -239,7 +240,7 @@ class SourceManagementService:
             "harvested": source.total_records_harvested,
         }
 
-    async def history(self, source_id: UUID, limit: int = 50) -> list[HarvestJob]:
+    async def history(self, source_id: UUID, limit: int = 50) -> builtins.list[HarvestJob]:
         if await self.get(source_id) is None:
             raise LookupError("Source not found")
         return list(
@@ -331,7 +332,7 @@ async def test_source_configuration(
     if source_type in DISCOVERY_TYPES:
         if not endpoint:
             raise ValueError("A DSpace REST API endpoint is required")
-        connector = DSpaceDiscoveryConnector(
+        discovery_connector = DSpaceDiscoveryConnector(
             ConnectorConfig(
                 code=code,
                 name=name,
@@ -341,7 +342,7 @@ async def test_source_configuration(
         )
         started = perf_counter()
         try:
-            identify = await connector.identify()
+            identify = await discovery_connector.identify()
             total = int(identify.get("totalElements") or 0)
             return {
                 "success": True,
@@ -376,7 +377,7 @@ async def test_source_configuration(
                 "errors": [str(exc)],
             }
         finally:
-            await connector.aclose()
+            await discovery_connector.aclose()
     if source_type not in OAI_TYPES:
         return {
             "success": True,
@@ -394,7 +395,7 @@ async def test_source_configuration(
         }
     if not endpoint:
         raise ValueError("An OAI endpoint is required")
-    connector = OAIPMHConnector(
+    oai_connector = OAIPMHConnector(
         ConnectorConfig(
             code=code,
             name=name,
@@ -406,8 +407,8 @@ async def test_source_configuration(
     )
     started = perf_counter()
     try:
-        identify = await asyncio.to_thread(connector.identify_sync)
-        formats = await asyncio.to_thread(connector.list_metadata_formats_sync)
+        identify = await asyncio.to_thread(oai_connector.identify_sync)
+        formats = await asyncio.to_thread(oai_connector.list_metadata_formats_sync)
         prefixes = [item["metadataPrefix"] for item in formats]
         errors = (
             []

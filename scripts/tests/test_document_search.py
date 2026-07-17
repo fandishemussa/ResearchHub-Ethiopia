@@ -9,25 +9,17 @@ from researchhub.infrastructure.persistence.session import (
 from sentence_transformers import SentenceTransformer
 from sqlalchemy import text
 
-MODEL_NAME = (
-    "sentence-transformers/"
-    "all-MiniLM-L6-v2"
-)
+MODEL_NAME = "sentence-transformers/all-MiniLM-L6-v2"
 
 
 def vector_literal(
-        values: list[float],
+    values: list[float],
 ) -> str:
-    return "[" + ",".join(
-        f"{value:.10f}"
-        for value in values
-    ) + "]"
+    return "[" + ",".join(f"{value:.10f}" for value in values) + "]"
 
 
 async def run(query: str) -> None:
-    model = SentenceTransformer(
-        MODEL_NAME
-    )
+    model = SentenceTransformer(MODEL_NAME)
 
     embedding = model.encode(
         [query],
@@ -59,9 +51,7 @@ async def run(query: str) -> None:
                 """
             ),
             {
-                "query_embedding": vector_literal(
-                    embedding.tolist()
-                ),
+                "query_embedding": vector_literal(embedding.tolist()),
             },
         )
 

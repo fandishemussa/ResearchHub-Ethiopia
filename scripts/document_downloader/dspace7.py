@@ -40,7 +40,11 @@ def _extract_search_items(payload: dict[str, Any]) -> list[dict[str, Any]]:
         return output
     for wrapper in wrappers:
         wrapper_embedded = wrapper.get("_embedded", {}) if isinstance(wrapper, dict) else {}
-        item = wrapper_embedded.get("indexableObject", {}) if isinstance(wrapper_embedded, dict) else {}
+        item = (
+            wrapper_embedded.get("indexableObject", {})
+            if isinstance(wrapper_embedded, dict)
+            else {}
+        )
         if not isinstance(item, dict):
             continue
         if item.get("type") != "item" or item.get("withdrawn"):
@@ -75,8 +79,14 @@ def iter_aau_publications(
             titles = _metadata_values(item, "dc.title")
             identifiers = _metadata_values(item, "dc.identifier.uri")
             handle = str(item.get("handle") or "").strip()
-            landing_url = identifiers[0] if identifiers else (
-                f"{source.base_url.rstrip('/')}/handle/{handle}" if handle else f"{source.base_url.rstrip('/')}/items/{uuid}"
+            landing_url = (
+                identifiers[0]
+                if identifiers
+                else (
+                    f"{source.base_url.rstrip('/')}/handle/{handle}"
+                    if handle
+                    else f"{source.base_url.rstrip('/')}/items/{uuid}"
+                )
             )
             yield Publication(
                 source=source.key,
@@ -94,7 +104,11 @@ def iter_aau_publications(
         result = _extract_search_result(payload)
         page_info = result.get("page", {})
         total_pages = page_info.get("totalPages") if isinstance(page_info, dict) else None
-        next_link = result.get("_links", {}).get("next", {}).get("href") if isinstance(result.get("_links", {}), dict) else None
+        next_link = (
+            result.get("_links", {}).get("next", {}).get("href")
+            if isinstance(result.get("_links", {}), dict)
+            else None
+        )
         if isinstance(total_pages, int):
             if page + 1 >= total_pages:
                 return
@@ -106,7 +120,9 @@ def iter_aau_publications(
 def _extract_embedded_list(payload: dict[str, Any], key: str) -> list[dict[str, Any]]:
     embedded = payload.get("_embedded", {})
     values = embedded.get(key, []) if isinstance(embedded, dict) else []
-    return [value for value in values if isinstance(value, dict)] if isinstance(values, list) else []
+    return (
+        [value for value in values if isinstance(value, dict)] if isinstance(values, list) else []
+    )
 
 
 def _bitstream_document_info(bitstream: dict[str, Any]) -> tuple[str | None, str | None]:
@@ -121,7 +137,9 @@ def _bitstream_document_info(bitstream: dict[str, Any]) -> tuple[str | None, str
         for key in ("dc.format", "dc.format.mimetype"):
             entries = metadata.get(key, [])
             if isinstance(entries, list):
-                values.extend(str(entry.get("value") or "") for entry in entries if isinstance(entry, dict))
+                values.extend(
+                    str(entry.get("value") or "") for entry in entries if isinstance(entry, dict)
+                )
     declared = " ".join(values).lower()
 
     if extension in SUPPORTED_DOCUMENT_EXTENSIONS:
@@ -153,10 +171,14 @@ def discover_aau_documents(
         if str(bundle.get("name") or "").strip().upper() != "ORIGINAL":
             continue
         links = bundle.get("_links", {})
-        bitstreams_href = links.get("bitstreams", {}).get("href") if isinstance(links, dict) else None
+        bitstreams_href = (
+            links.get("bitstreams", {}).get("href") if isinstance(links, dict) else None
+        )
         bundle_uuid = str(bundle.get("uuid") or bundle.get("id") or "").strip()
         if not bitstreams_href and bundle_uuid:
-            bitstreams_href = urljoin(source.base_url, f"/server/api/core/bundles/{bundle_uuid}/bitstreams")
+            bitstreams_href = urljoin(
+                source.base_url, f"/server/api/core/bundles/{bundle_uuid}/bitstreams"
+            )
         if not bitstreams_href:
             continue
 
@@ -170,7 +192,9 @@ def discover_aau_documents(
             content_href = links.get("content", {}).get("href") if isinstance(links, dict) else None
             bitstream_uuid = str(bitstream.get("uuid") or bitstream.get("id") or "").strip()
             if not content_href and bitstream_uuid:
-                content_href = urljoin(source.base_url, f"/server/api/core/bitstreams/{bitstream_uuid}/content")
+                content_href = urljoin(
+                    source.base_url, f"/server/api/core/bitstreams/{bitstream_uuid}/content"
+                )
             if content_href:
                 size = bitstream.get("sizeBytes")
                 candidates.append(

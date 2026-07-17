@@ -28,9 +28,7 @@ async def seed_authorization_vocabulary(session: AsyncSession) -> RbacSeedResult
     """Create missing system roles, permissions and grants without deleting data."""
 
     roles = {item.name: item for item in (await session.scalars(select(Role))).all()}
-    permissions = {
-        item.code: item for item in (await session.scalars(select(Permission))).all()
-    }
+    permissions = {item.code: item for item in (await session.scalars(select(Permission))).all()}
     roles_created = 0
     permissions_created = 0
 
@@ -50,9 +48,7 @@ async def seed_authorization_vocabulary(session: AsyncSession) -> RbacSeedResult
 
     existing = set(
         (
-            await session.execute(
-                select(RolePermission.role_id, RolePermission.permission_id)
-            )
+            await session.execute(select(RolePermission.role_id, RolePermission.permission_id))
         ).tuples()
     )
     grants_created = 0

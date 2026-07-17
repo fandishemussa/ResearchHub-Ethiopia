@@ -110,7 +110,9 @@ class FakePublicationRepository:
         self.calls.append("doi")
         return self.by_doi
 
-    async def get_by_source_identifier(self, *, source: str, external_id: str) -> Publication | None:
+    async def get_by_source_identifier(
+        self, *, source: str, external_id: str
+    ) -> Publication | None:
         """Return source identifier match."""
 
         self.calls.append("source_external_id")
@@ -250,7 +252,9 @@ class HarvestPersistenceTests(unittest.TestCase):
 
         found, matched_by = asyncio.run(
             service._match_existing_publication(
-                metadata(doi=None, title="Soil fertility in Ethiopia", first_author="Another Author")
+                metadata(
+                    doi=None, title="Soil fertility in Ethiopia", first_author="Another Author"
+                )
             )
         )
 
@@ -265,7 +269,9 @@ class HarvestPersistenceTests(unittest.TestCase):
         """Existing authors, journals, keywords, types, and licenses are reused."""
 
         service = object.__new__(HarvestPersistenceService)
-        existing_author = Author(id=uuid4(), full_name="Tesfaye Lemma", normalized_name="tesfaye lemma")
+        existing_author = Author(
+            id=uuid4(), full_name="Tesfaye Lemma", normalized_name="tesfaye lemma"
+        )
         existing_journal = Journal(id=uuid4(), name="Journal", normalized_name="journal")
         existing_keyword = Keyword(id=uuid4(), term="soil", normalized_term="soil")
         existing_type = PublicationType(id=uuid4(), name="Article", normalized_name="article")
@@ -355,7 +361,9 @@ class HarvestPersistenceTests(unittest.TestCase):
         asyncio.run(service._sync_keywords(publication, item))
 
         author_links = [row for row in service.session.added if isinstance(row, PublicationAuthor)]
-        keyword_links = [row for row in service.session.added if isinstance(row, PublicationKeyword)]
+        keyword_links = [
+            row for row in service.session.added if isinstance(row, PublicationKeyword)
+        ]
         self.assertEqual(len(author_links), 1)
         self.assertEqual(len(keyword_links), 1)
 
@@ -363,11 +371,7 @@ class HarvestPersistenceTests(unittest.TestCase):
         """The Alembic migration adds controlled vocabulary and provenance columns."""
 
         migration = (
-            ROOT
-            / "backend"
-            / "alembic"
-            / "versions"
-            / "0003_metadata_persistence_pipeline.py"
+            ROOT / "backend" / "alembic" / "versions" / "0003_metadata_persistence_pipeline.py"
         ).read_text(encoding="utf-8")
 
         self.assertIn("publication_types", migration)

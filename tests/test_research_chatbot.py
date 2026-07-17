@@ -68,9 +68,7 @@ def test_local_provider_refuses_to_invent_when_retrieval_is_empty() -> None:
 
 
 class UnavailableChatProvider:
-    async def complete(
-        self, question: str, sources: list[ChatSource]
-    ) -> ChatCompletion:
+    async def complete(self, question: str, sources: list[ChatSource]) -> ChatCompletion:
         del question, sources
         raise OSError("provider unavailable")
 

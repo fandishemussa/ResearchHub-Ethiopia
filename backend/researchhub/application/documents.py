@@ -3,7 +3,8 @@
 from pathlib import Path
 from uuid import UUID
 
-from sqlalchemy import func, select
+from sqlalchemy import Select, func, select
+from sqlalchemy.engine import Row
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from researchhub.infrastructure.persistence.models import DocumentChunk, ResearchDocument
@@ -106,7 +107,7 @@ class ResearchDocumentService:
         return path
 
     @staticmethod
-    def _detail_statement():
+    def _detail_statement() -> Select[tuple[ResearchDocument, int, int, int, str | None]]:
         return (
             select(
                 ResearchDocument,
@@ -120,7 +121,9 @@ class ResearchDocumentService:
         )
 
     @staticmethod
-    def _row(row) -> dict[str, object]:
+    def _row(
+        row: Row[tuple[ResearchDocument, int, int, int, str | None]],
+    ) -> dict[str, object]:
         document, chunk_count, character_count, embedded_chunk_count, embedding_model = row
         return {
             "id": document.id,

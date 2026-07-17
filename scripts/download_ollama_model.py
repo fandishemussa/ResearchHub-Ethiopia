@@ -176,10 +176,7 @@ def download_small_blob(repository: str, descriptor: dict[str, Any], blobs: Path
             ):
                 response.raise_for_status()
                 content = b"".join(response.iter_raw())
-            if (
-                len(content) != expected_size
-                or hashlib.sha256(content).hexdigest() != hex_digest
-            ):
+            if len(content) != expected_size or hashlib.sha256(content).hexdigest() != hex_digest:
                 raise RuntimeError(f"validation failed for {digest}")
             temporary = destination.with_suffix(".manual")
             temporary.write_bytes(content)

@@ -257,7 +257,9 @@ def require_university_scope() -> Callable[..., object]:
         service: AuthorizationService = Depends(get_authorization_service),
     ) -> User:
         if not await service.within_university(user, university_id):
-            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="University scope denied")
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN, detail="University scope denied"
+            )
         return user
 
     return dependency
@@ -270,7 +272,9 @@ def require_department_scope() -> Callable[..., object]:
         service: AuthorizationService = Depends(get_authorization_service),
     ) -> User:
         if not await service.within_department(user, department_id):
-            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Department scope denied")
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN, detail="Department scope denied"
+            )
         return user
 
     return dependency

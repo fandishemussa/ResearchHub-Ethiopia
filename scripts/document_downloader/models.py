@@ -21,16 +21,10 @@ class Publication:
     title: str | None = None
     landing_url: str | None = None
     item_uuid: str | None = None
-    identifiers: list[str] = field(
-        default_factory=list
-    )
-    authors: list[str] = field(
-        default_factory=list
-    )
+    identifiers: list[str] = field(default_factory=list)
+    authors: list[str] = field(default_factory=list)
     issued_date: str | None = None
-    raw: dict[str, Any] = field(
-        default_factory=dict
-    )
+    raw: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass(slots=True)

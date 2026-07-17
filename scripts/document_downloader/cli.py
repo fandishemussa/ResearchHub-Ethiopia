@@ -43,9 +43,7 @@ def build_parser() -> argparse.ArgumentParser:
         default=15,
         help="Number of retry and resume attempts",
     )
-    parser.add_argument(
-        "--delay", type=float, default=1.5, help="Polite delay after every request"
-    )
+    parser.add_argument("--delay", type=float, default=1.5, help="Polite delay after every request")
     parser.add_argument("--max-file-size-mb", type=int, default=250)
     parser.add_argument("--resume", action="store_true")
     parser.add_argument("--overwrite", action="store_true")

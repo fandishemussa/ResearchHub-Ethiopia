@@ -14,18 +14,16 @@ class TextChunk:
 
 
 def chunk_pages(
-        pages: list[ExtractedPage],
-        *,
-        chunk_size: int = 3500,
-        overlap: int = 500,
+    pages: list[ExtractedPage],
+    *,
+    chunk_size: int = 3500,
+    overlap: int = 500,
 ) -> list[TextChunk]:
     if chunk_size <= 0:
         raise ValueError("chunk_size must be positive")
 
     if overlap < 0 or overlap >= chunk_size:
-        raise ValueError(
-            "overlap must be between 0 and chunk_size"
-        )
+        raise ValueError("overlap must be between 0 and chunk_size")
 
     chunks: list[TextChunk] = []
     chunk_index = 0
@@ -42,7 +40,7 @@ def chunk_pages(
             end = min(
                 start + chunk_size,
                 len(text),
-                )
+            )
 
             # Prefer ending at a paragraph or sentence boundary.
             if end < len(text):
@@ -86,6 +84,6 @@ def chunk_pages(
             start = max(
                 end - overlap,
                 start + 1,
-                )
+            )
 
     return chunks

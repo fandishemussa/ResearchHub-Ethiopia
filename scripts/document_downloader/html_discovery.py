@@ -36,7 +36,10 @@ def _is_supported_document_link(url: str, text: str = "") -> bool:
         return True
     if any(hint in lowered_url for hint in DOCUMENT_URL_HINTS):
         return True
-    return any(word in lowered_text for word in ("pdf", "doc", "docx", "download", "full text", "view document"))
+    return any(
+        word in lowered_text
+        for word in ("pdf", "doc", "docx", "download", "full text", "view document")
+    )
 
 
 def _candidate_mime_type(url: str) -> str | None:
@@ -120,6 +123,7 @@ def discover_from_landing_page(
                 uuid = payload.get("uuid") or payload.get("id")
                 if uuid:
                     from .dspace7 import discover_aau_documents
+
                     return discover_aau_documents(client, source, str(uuid))
             except Exception:
                 pass

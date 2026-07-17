@@ -34,4 +34,3 @@ class HarvestRunner:
             await self.sink(publication)
             stats["exported"] += 1
         return stats
-

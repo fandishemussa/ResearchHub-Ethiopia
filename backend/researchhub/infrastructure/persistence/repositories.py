@@ -9,13 +9,15 @@ from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
-from typing import Any, Generic, TypeVar
+from typing import Any, Generic, TypeVar, cast
 from uuid import UUID
 
 from sqlalchemy import Select, desc, func, or_, select
 from sqlalchemy import delete as sa_delete
+from sqlalchemy.engine import CursorResult
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
+from sqlalchemy.orm.attributes import InstrumentedAttribute
 
 from researchhub.infrastructure.persistence.base import Base
 from researchhub.infrastructure.persistence.models import (
@@ -37,6 +39,7 @@ from researchhub.infrastructure.persistence.models import (
 )
 
 ModelT = TypeVar("ModelT", bound=Base)
+PageItemT = TypeVar("PageItemT")
 
 
 @dataclass(frozen=True, slots=True)
@@ -53,10 +56,10 @@ class Pagination:
 
 
 @dataclass(frozen=True, slots=True)
-class Page(Generic[ModelT]):
+class Page(Generic[PageItemT]):
     """Paginated repository result."""
 
-    items: Sequence[ModelT]
+    items: Sequence[PageItemT]
     total: int
     limit: int
     offset: int
@@ -218,11 +221,16 @@ class AsyncRepository(Generic[ModelT]):
     async def delete_where(self, *criteria: Any) -> int:
         """Physically delete rows matching criteria and return affected count."""
 
-        result = await self.session.execute(sa_delete(self.model).where(*criteria))
+        result = cast(
+            CursorResult[Any],
+            await self.session.execute(sa_delete(self.model).where(*criteria)),
+        )
         await self.session.flush()
         return int(result.rowcount or 0)
 
-    def query(self, filters: Any = None, pagination: Pagination | None = None) -> Select[tuple[ModelT]]:
+    def query(
+        self, filters: Any = None, pagination: Pagination | None = None
+    ) -> Select[tuple[ModelT]]:
         """Build a filtered, ordered, paginated SELECT statement."""
 
         statement = self._filtered_statement(filters)
@@ -275,10 +283,12 @@ class AsyncRepository(Generic[ModelT]):
     def _ordered_statement(self, statement: Select[tuple[ModelT]]) -> Select[tuple[ModelT]]:
         """Apply default ordering."""
 
-        if hasattr(self.model, "updated_at"):
-            return statement.order_by(desc(self.model.updated_at))
-        if hasattr(self.model, "created_at"):
-            return statement.order_by(desc(self.model.created_at))
+        updated_at = getattr(self.model, "updated_at", None)
+        if updated_at is not None:
+            return statement.order_by(desc(updated_at))
+        created_at = getattr(self.model, "created_at", None)
+        if created_at is not None:
+            return statement.order_by(desc(created_at))
         return statement
 
 
@@ -295,7 +305,9 @@ class UniversityRepository(AsyncRepository[University]):
         )
         return result.first()
 
-    def _filtered_statement(self, filters: UniversityFilters | None = None) -> Select[tuple[University]]:
+    def _filtered_statement(
+        self, filters: UniversityFilters | None = None
+    ) -> Select[tuple[University]]:
         statement = select(University)
         if filters is None:
             return statement
@@ -392,7 +404,9 @@ class KeywordRepository(AsyncRepository[Keyword]):
             return statement
         if filters.q:
             q = f"%{filters.q}%"
-            statement = statement.where(or_(Keyword.term.ilike(q), Keyword.normalized_term.ilike(q)))
+            statement = statement.where(
+                or_(Keyword.term.ilike(q), Keyword.normalized_term.ilike(q))
+            )
         if filters.vocabulary:
             statement = statement.where(Keyword.vocabulary == filters.vocabulary)
         return statement
@@ -428,9 +442,13 @@ class JournalRepository(AsyncRepository[Journal]):
             return statement
         if filters.q:
             q = f"%{filters.q}%"
-            statement = statement.where(or_(Journal.name.ilike(q), Journal.normalized_name.ilike(q)))
+            statement = statement.where(
+                or_(Journal.name.ilike(q), Journal.normalized_name.ilike(q))
+            )
         if filters.issn:
-            statement = statement.where(or_(Journal.issn == filters.issn, Journal.eissn == filters.issn))
+            statement = statement.where(
+                or_(Journal.issn == filters.issn, Journal.eissn == filters.issn)
+            )
         if filters.university_id:
             statement = statement.where(Journal.university_id == filters.university_id)
         return statement
@@ -445,7 +463,9 @@ class PublicationTypeRepository(AsyncRepository[PublicationType]):
         """Return a publication type by normalized name."""
 
         result = await self.session.scalars(
-            select(PublicationType).where(PublicationType.normalized_name == normalized_name).limit(1)
+            select(PublicationType)
+            .where(PublicationType.normalized_name == normalized_name)
+            .limit(1)
         )
         return result.first()
 
@@ -495,7 +515,9 @@ class PublicationRepository(AsyncRepository[Publication]):
     async def get_by_doi(self, doi: str) -> Publication | None:
         """Return a publication by DOI."""
 
-        result = await self.session.scalars(select(Publication).where(Publication.doi == doi).limit(1))
+        result = await self.session.scalars(
+            select(Publication).where(Publication.doi == doi).limit(1)
+        )
         return result.first()
 
     async def get_by_source_identifier(
@@ -600,18 +622,24 @@ class PublicationRepository(AsyncRepository[Publication]):
             statement = statement.where(Publication.source_type == filters.source_type)
         if filters.q:
             q = f"%{filters.q}%"
-            statement = statement.where(or_(Publication.title.ilike(q), Publication.abstract.ilike(q)))
+            statement = statement.where(
+                or_(Publication.title.ilike(q), Publication.abstract.ilike(q))
+            )
         if filters.author:
             q = f"%{_normalize_filter(filters.author)}%"
             statement = (
-                statement.join(PublicationAuthor, PublicationAuthor.publication_id == Publication.id)
+                statement.join(
+                    PublicationAuthor, PublicationAuthor.publication_id == Publication.id
+                )
                 .join(Author, Author.id == PublicationAuthor.author_id)
                 .where(Author.normalized_name.ilike(q))
             )
         if filters.keyword:
             q = f"%{_normalize_filter(filters.keyword)}%"
             statement = (
-                statement.join(PublicationKeyword, PublicationKeyword.publication_id == Publication.id)
+                statement.join(
+                    PublicationKeyword, PublicationKeyword.publication_id == Publication.id
+                )
                 .join(Keyword, Keyword.id == PublicationKeyword.keyword_id)
                 .where(Keyword.normalized_term.ilike(q))
             )
@@ -635,7 +663,9 @@ class HarvestJobRepository(AsyncRepository[HarvestJob]):
 
     model = HarvestJob
 
-    def _filtered_statement(self, filters: HarvestJobFilters | None = None) -> Select[tuple[HarvestJob]]:
+    def _filtered_statement(
+        self, filters: HarvestJobFilters | None = None
+    ) -> Select[tuple[HarvestJob]]:
         statement = select(HarvestJob)
         if filters is None:
             return statement
@@ -644,7 +674,9 @@ class HarvestJobRepository(AsyncRepository[HarvestJob]):
         if filters.status:
             statement = statement.where(HarvestJob.status == filters.status)
         if filters.since_year:
-            statement = statement.where(func.extract("year", HarvestJob.since) == filters.since_year)
+            statement = statement.where(
+                func.extract("year", HarvestJob.since) == filters.since_year
+            )
         if filters.has_errors is not None:
             statement = statement.where(
                 HarvestJob.error_count > 0 if filters.has_errors else HarvestJob.error_count == 0
@@ -706,7 +738,9 @@ class QualityReportRepository(AsyncRepository[QualityReport]):
     def _filtered_statement(
         self, filters: QualityReportFilters | None = None
     ) -> Select[tuple[QualityReport]]:
-        statement = select(QualityReport).join(Publication, QualityReport.publication_id == Publication.id)
+        statement = select(QualityReport).join(
+            Publication, QualityReport.publication_id == Publication.id
+        )
         if filters is None:
             return statement
         if filters.publication_id:
@@ -742,7 +776,7 @@ class QualityReportRepository(AsyncRepository[QualityReport]):
     ) -> Select[tuple[QualityReport]]:
         """Apply caller-selected quality report ordering."""
 
-        sort_column = QualityReport.assessed_at
+        sort_column: InstrumentedAttribute[Any] = QualityReport.assessed_at
         sort_by = filters.sort_by if filters else "assessed_at"
         sort_order = filters.sort_order.lower() if filters else "desc"
         if sort_by == "final_score":

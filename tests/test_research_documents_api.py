@@ -76,7 +76,5 @@ async def test_content_path_rejects_non_pdf_and_missing_record(tmp_path: Path) -
         (None, None),
     ],
 )
-def test_public_document_urls_are_http_only(
-    value: str | None, expected: str | None
-) -> None:
+def test_public_document_urls_are_http_only(value: str | None, expected: str | None) -> None:
     assert _public_url(value) == expected

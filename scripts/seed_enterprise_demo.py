@@ -60,7 +60,10 @@ async def seed(args: argparse.Namespace) -> Counts:
                 country="Ethiopia",
                 city="Haramaya",
                 website_url="https://www.haramaya.edu.et/",
-                metadata_json={**DEMO_MARKER, "notice": "Demonstration configuration; not an official institutional record."},
+                metadata_json={
+                    **DEMO_MARKER,
+                    "notice": "Demonstration configuration; not an official institutional record.",
+                },
             )
             session.add(university)
             counts.created += 1
@@ -68,25 +71,47 @@ async def seed(args: argparse.Namespace) -> Counts:
             counts.reused += 1
         await session.flush()
 
-        faculty = await session.scalar(select(Faculty).where(Faculty.university_id == university.id, Faculty.code == "DEMO-COA"))
+        faculty = await session.scalar(
+            select(Faculty).where(
+                Faculty.university_id == university.id, Faculty.code == "DEMO-COA"
+            )
+        )
         if faculty is None:
-            faculty = Faculty(university_id=university.id, code="DEMO-COA", name="College of Agriculture (Demonstration)")
+            faculty = Faculty(
+                university_id=university.id,
+                code="DEMO-COA",
+                name="College of Agriculture (Demonstration)",
+            )
             session.add(faculty)
             counts.created += 1
         else:
             counts.reused += 1
         await session.flush()
 
-        department = await session.scalar(select(Department).where(Department.university_id == university.id, Department.code == "DEMO-PLANT"))
+        department = await session.scalar(
+            select(Department).where(
+                Department.university_id == university.id, Department.code == "DEMO-PLANT"
+            )
+        )
         if department is None:
-            department = Department(university_id=university.id, faculty_id=faculty.id, code="DEMO-PLANT", name="Plant Sciences (Demonstration)")
+            department = Department(
+                university_id=university.id,
+                faculty_id=faculty.id,
+                code="DEMO-PLANT",
+                name="Plant Sciences (Demonstration)",
+            )
             session.add(department)
             counts.created += 1
         else:
             counts.reused += 1
         await session.flush()
 
-        repository = await session.scalar(select(Repository).where(Repository.university_id == university.id, Repository.name == "ResearchHub Demonstration Repository"))
+        repository = await session.scalar(
+            select(Repository).where(
+                Repository.university_id == university.id,
+                Repository.name == "ResearchHub Demonstration Repository",
+            )
+        )
         if repository is None:
             repository = Repository(
                 university_id=university.id,
@@ -103,7 +128,9 @@ async def seed(args: argparse.Namespace) -> Counts:
             counts.reused += 1
         await session.flush()
 
-        connector = await session.scalar(select(Connector).where(Connector.code == "haramaya-demo-source"))
+        connector = await session.scalar(
+            select(Connector).where(Connector.code == "haramaya-demo-source")
+        )
         if connector is None:
             connector = Connector(
                 code="haramaya-demo-source",
@@ -127,7 +154,9 @@ async def seed(args: argparse.Namespace) -> Counts:
         authors: list[Author] = []
         for index in range(1, 3):
             normalized = f"demonstration researcher {index}"
-            author = await session.scalar(select(Author).where(Author.normalized_name == normalized))
+            author = await session.scalar(
+                select(Author).where(Author.normalized_name == normalized)
+            )
             if author is None:
                 author = Author(
                     full_name=f"Demonstration Researcher {index}",
@@ -153,7 +182,11 @@ async def seed(args: argparse.Namespace) -> Counts:
         publications: list[Publication] = []
         for index, title in enumerate(titles, start=1):
             external_id = f"enterprise-demo:{index}"
-            publication = await session.scalar(select(Publication).where(Publication.source == "enterprise-demo", Publication.external_id == external_id))
+            publication = await session.scalar(
+                select(Publication).where(
+                    Publication.source == "enterprise-demo", Publication.external_id == external_id
+                )
+            )
             if publication is None:
                 publication = Publication(
                     external_id=external_id,
@@ -182,29 +215,49 @@ async def seed(args: argparse.Namespace) -> Counts:
 
         for index, publication in enumerate(publications):
             author = authors[index % len(authors)]
-            link = await session.scalar(select(PublicationAuthor).where(PublicationAuthor.publication_id == publication.id, PublicationAuthor.author_id == author.id))
+            link = await session.scalar(
+                select(PublicationAuthor).where(
+                    PublicationAuthor.publication_id == publication.id,
+                    PublicationAuthor.author_id == author.id,
+                )
+            )
             if link is None:
-                session.add(PublicationAuthor(publication_id=publication.id, author_id=author.id, author_order=1, affiliation="Haramaya University (Demonstration)"))
+                session.add(
+                    PublicationAuthor(
+                        publication_id=publication.id,
+                        author_id=author.id,
+                        author_order=1,
+                        affiliation="Haramaya University (Demonstration)",
+                    )
+                )
                 counts.created += 1
             else:
                 counts.reused += 1
 
-        demo_job = await session.scalar(select(HarvestJob).where(HarvestJob.connector_id == connector.id, HarvestJob.mode == "dry_run", HarvestJob.metadata_json["demo"].as_boolean().is_(True)))
+        demo_job = await session.scalar(
+            select(HarvestJob).where(
+                HarvestJob.connector_id == connector.id,
+                HarvestJob.mode == "dry_run",
+                HarvestJob.metadata_json["demo"].as_boolean().is_(True),
+            )
+        )
         if demo_job is None:
-            session.add(HarvestJob(
-                connector_id=connector.id,
-                status="completed",
-                mode="dry_run",
-                job_type="demo",
-                dry_run=True,
-                started_at=datetime.now(UTC),
-                completed_at=datetime.now(UTC),
-                total_records=len(publications),
-                fetched_records=len(publications),
-                unchanged_records=len(publications),
-                metadata_json=DEMO_MARKER,
-                result_summary={**DEMO_MARKER, "message": "Offline showcase fallback job."},
-            ))
+            session.add(
+                HarvestJob(
+                    connector_id=connector.id,
+                    status="completed",
+                    mode="dry_run",
+                    job_type="demo",
+                    dry_run=True,
+                    started_at=datetime.now(UTC),
+                    completed_at=datetime.now(UTC),
+                    total_records=len(publications),
+                    fetched_records=len(publications),
+                    unchanged_records=len(publications),
+                    metadata_json=DEMO_MARKER,
+                    result_summary={**DEMO_MARKER, "message": "Offline showcase fallback job."},
+                )
+            )
             counts.created += 1
         else:
             counts.reused += 1
@@ -212,8 +265,12 @@ async def seed(args: argparse.Namespace) -> Counts:
         if args.admin_email:
             password = os.getenv(args.admin_password_env)
             if not password:
-                raise ValueError(f"{args.admin_password_env} must be set when --admin-email is used")
-            user = await session.scalar(select(User).where(User.email == args.admin_email.strip().casefold()))
+                raise ValueError(
+                    f"{args.admin_password_env} must be set when --admin-email is used"
+                )
+            user = await session.scalar(
+                select(User).where(User.email == args.admin_email.strip().casefold())
+            )
             if user is None:
                 user = User(
                     email=args.admin_email.strip().casefold(),

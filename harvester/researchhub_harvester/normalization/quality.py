@@ -21,4 +21,3 @@ def quality_score(record: Mapping[str, Any]) -> tuple[float, list[str], list[str
     if record.get("is_deleted"):
         warnings.append("Record is marked deleted by source")
     return max(score, 0.0), missing, warnings
-
