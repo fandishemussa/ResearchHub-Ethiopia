@@ -1,26 +1,299 @@
-# Continuous integration for backend and harvester quality gates.
-
-name: ci
+name: CI
 
 on:
+  pull_request:
+    branches: [master]
   push:
     branches: [master]
-  pull_request:
+    tags: ["v*.*.*"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  PYTHON_VERSION: "3.13"
+  PIP_DISABLE_PIP_VERSION_CHECK: "1"
+  PIP_NO_PYTHON_VERSION_WARNING: "1"
+
+defaults:
+  run:
+    shell: bash
 
 jobs:
-  test:
+  quality:
+    name: Lint, format, and type safety
     runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.13"
-      - name: Install dependencies
-        run: python -m pip install --upgrade pip && python -m pip install -e ".[test]"
-      - name: Lint
-        run: ruff check backend harvester ai tests
-      - name: Type check
-        run: mypy backend harvester ai
-      - name: Test
-        run: pytest
+    timeout-minutes: 20
 
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: pyproject.toml
+
+      - name: Install project quality dependencies
+        run: |
+          python -m pip install --upgrade pip setuptools wheel
+          python -m pip install -e ".[test]"
+          python -m pip check
+
+      - name: Lint Python
+        run: ruff check backend harvester ai scripts tests --output-format=github
+
+      - name: Check Python formatting
+        run: ruff format --check backend harvester ai scripts tests
+
+      - name: Type-check Python
+        run: mypy backend harvester ai
+
+  unit-tests:
+    name: Unit tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: pyproject.toml
+
+      - name: Install project test dependencies
+        run: |
+          python -m pip install --upgrade pip setuptools wheel
+          python -m pip install -e ".[test]"
+          python -m pip check
+
+      - name: Run unit tests with coverage
+        run: |
+          pytest \
+            --strict-config \
+            --strict-markers \
+            --junitxml=pytest-results.xml \
+            --cov=researchhub \
+            --cov=researchhub_harvester \
+            --cov=researchhub_ai \
+            --cov-report=term-missing \
+            --cov-report=xml:coverage.xml
+
+      - name: Upload test and coverage reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: python-test-reports
+          path: |
+            pytest-results.xml
+            coverage.xml
+          if-no-files-found: warn
+          retention-days: 14
+
+  integration-tests:
+    name: PostgreSQL, Redis, and migrations
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    services:
+      postgres:
+        image: pgvector/pgvector:pg17
+        env:
+          POSTGRES_USER: researchhub
+          POSTGRES_PASSWORD: researchhub
+          POSTGRES_DB: researchhub
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U researchhub -d researchhub"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      RESEARCHHUB_DATABASE_URL: postgresql+asyncpg://researchhub:researchhub@localhost:5432/researchhub
+      RESEARCHHUB_SYNC_DATABASE_URL: postgresql+psycopg://researchhub:researchhub@localhost:5432/researchhub
+      RESEARCHHUB_REDIS_URL: redis://localhost:6379/0
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: pyproject.toml
+
+      - name: Install project
+        run: |
+          python -m pip install --upgrade pip setuptools wheel
+          python -m pip install -e ".[test]"
+
+      - name: Validate a single Alembic head
+        run: |
+          test "$(alembic -c backend/alembic.ini heads | wc -l)" -eq 1
+
+      - name: Apply all database migrations
+        run: alembic -c backend/alembic.ini upgrade head
+
+      - name: Verify current migration
+        run: alembic -c backend/alembic.ini current --check-heads
+
+      - name: Smoke-test application imports
+        run: |
+          python - <<'PY'
+          from researchhub.main import app
+
+          assert app.title
+          print(f"Loaded FastAPI application: {app.title}")
+          PY
+
+  package:
+    name: Build Python distribution
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: pyproject.toml
+
+      - name: Build wheel and source distribution
+        run: |
+          python -m pip install --upgrade pip build
+          python -m build
+
+      - name: Verify built wheel
+        run: |
+          python -m pip install --force-reinstall dist/*.whl
+          python -c "from researchhub.main import app; assert app.title"
+
+      - name: Upload distributions
+        uses: actions/upload-artifact@v4
+        with:
+          name: python-distributions
+          path: dist/
+          if-no-files-found: error
+          retention-days: 14
+
+  codeql:
+    name: CodeQL security analysis
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    permissions:
+      contents: read
+      security-events: write
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: python
+          queries: security-extended
+
+      - name: Analyze source
+        uses: github/codeql-action/analyze@v3
+        with:
+          category: /language:python
+
+  docker:
+    name: Build and smoke-test backend image
+    runs-on: ubuntu-latest
+    timeout-minutes: 50
+    needs: [quality, unit-tests, integration-tests, package]
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build backend image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: backend/Dockerfile
+          load: true
+          push: false
+          tags: researchhub-ethiopia:ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Smoke-test backend image
+        run: |
+          docker run --rm researchhub-ethiopia:ci \
+            python -c "from researchhub.main import app; assert app.title"
+
+  ci-success:
+    name: CI success
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    if: always()
+    needs: [quality, unit-tests, integration-tests, package, codeql, docker]
+
+    steps:
+      - name: Enforce required job results
+        env:
+          QUALITY: ${{ needs.quality.result }}
+          UNIT_TESTS: ${{ needs.unit-tests.result }}
+          INTEGRATION_TESTS: ${{ needs.integration-tests.result }}
+          PACKAGE: ${{ needs.package.result }}
+          CODEQL: ${{ needs.codeql.result }}
+          DOCKER: ${{ needs.docker.result }}
+        run: |
+          for result in \
+            "$QUALITY" \
+            "$UNIT_TESTS" \
+            "$INTEGRATION_TESTS" \
+            "$PACKAGE" \
+            "$CODEQL" \
+            "$DOCKER"; do
+            test "$result" = "success"
+          done
+
+  delivery:
+    name: Deliver trusted image
+    if: github.event_name == 'push'
+    needs: [ci-success]
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+      attestations: write
+    uses: ./.github/workflows/delivery.yml
+    with:
+      source-ref: ${{ github.sha }}
+    secrets: inherit
